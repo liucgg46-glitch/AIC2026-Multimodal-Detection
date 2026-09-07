@@ -1,61 +1,181 @@
-# AIC2026 Multimodal Detection Project
+# PROJECT_SPEC
 
-## Competition Task
+## 1. 项目名称
 
-AIC2026 算法挑战赛：
-面向城市场景的视觉多模态目标检测。
+AIC2026 算法挑战赛——面向城市场景的视觉多模态目标检测
 
-输入模态：
+## 2. 任务定义
 
-1. visible：RGB 可见光图像
-2. infrared：红外图像
-3. depth：深度图像
+项目使用空间对齐的三模态图像完成 12 类目标检测：
 
-任务：
+- Visible / RGB
+- Infrared
+- Depth
 
-根据三模态信息检测图像中的目标并输出 bounding boxes 和类别。
+类别定义：
 
-## Main Objective
+```text
+0  person
+1  boat
+2  animal
+3  seat
+4  sign
+5  bicycle
+6  car
+7  ball
+8  light
+9  garbage can
+10 uav
+11 tricycle
+```
 
-项目第一目标：
+其中：
 
-在14天内完成可复现的初赛有效提交。
+- `sign` 包含路牌、标语、标志；
+- `bicycle` 包含自行车和双轮电动车；
+- `light` 包含路灯和室内照明灯。
 
-长期目标：
+## 3. 数据组织
 
-进入半决赛并冲击国奖。
+项目统一采用以下逻辑目录：
 
-## Development Strategy
+```text
+data/
+├── raw/
+│   ├── train/
+│   │   ├── visible/
+│   │   ├── infrared/
+│   │   ├── depth/
+│   │   └── labels/
+│   └── test/
+│       ├── visible/
+│       ├── infrared/
+│       └── depth/
+├── splits/
+│   ├── train.txt
+│   └── val.txt
+└── processed/
+```
 
-按照以下顺序开发：
+说明：
 
-1. 数据检查
-2. RGB-only baseline
-3. IR-only baseline
-4. Depth-only baseline
-5. 简单多模态融合
-6. RGB+IR+Depth Early Fusion
-7. Feature-level Fusion
-8. Adaptive / Reliability Fusion
-9. 小目标优化
-10. 最终比赛优化
+- `data/raw/train/`：正式训练数据；
+- `data/raw/test/`：当前阶段官方测试数据；
+- `data/splits/`：从正式训练集中固定划分的 train / val 样本列表；
+- `data/processed/`：必要时保存派生数据、缓存或格式转换结果。
 
-## Base Framework
+官方原始数据保持只读，不覆盖、不重新编码。
+
+## 4. 阶段目标
+
+### 4.1 初赛目标
+
+在当前开发周期内完成：
+
+1. 数据完整性与标签检查；
+2. 类别、bbox 与三模态数据统计；
+3. 固定 train / val 划分；
+4. RGB-only YOLO baseline；
+5. 初赛推理与合法提交；
+6. 获得高于赛事 baseline 的有效成绩；
+7. 建立第一版三模态 baseline。
+
+### 4.2 长期目标
+
+- 持续提高排行榜成绩；
+- 进入复赛与半决赛；
+- 形成可复现的完整训练与推理流程；
+- 完成消融实验、技术报告与模型说明；
+- 以国奖为目标进行后续优化。
+
+## 5. 技术栈
 
 优先使用：
 
-- Python
+- Python 3.8+
 - PyTorch
 - Ultralytics YOLO
+- OpenCV
+- NumPy
+- Pandas
+- Matplotlib
 
-禁止在没有明确理由的情况下切换整个训练框架。
+在没有明确实验依据的情况下，不随意更换整个训练框架。
 
-## Development Principle
+## 6. 评价指标
 
-每次只实现一个明确功能。
+主指标：
 
-每次算法修改都必须能够通过实验验证。
+```text
+mAP@50-95
+```
 
-不要同时修改多个主要变量。
+辅助记录：
 
-所有代码必须保证可复现。
+- mAP50
+- Precision
+- Recall
+- per-class AP
+- best epoch
+
+模型选择与优化优先依据 `mAP@50-95`。
+
+## 7. 赛事约束
+
+### 7.1 数据
+
+训练仅使用赛事官方训练数据。
+
+允许使用赛事规则许可的公开预训练权重，例如：
+
+- ImageNet
+- COCO
+- Objects365
+
+测试数据：
+
+- 仅用于推理与生成提交结果；
+- 不参与训练；
+- 不参与本地验证集划分；
+- 不人工标注；
+- 不修改；
+- 不公开传播。
+
+### 7.2 推理
+
+最终训练与推理流程必须能够离线完成。
+
+### 7.3 模型
+
+不采用赛事规则禁止的简单多模型投票、平均等集成方式。
+
+### 7.4 原创性与可复现性
+
+正式参赛代码、模型和方法应保持原创、可解释、可复现。
+
+## 8. 开发阶段
+
+```text
+Phase 1  数据检查与统计
+Phase 2  固定 train / val
+Phase 3  RGB-only baseline
+Phase 4  IR-only / Depth-only 消融
+Phase 5  简单多模态融合
+Phase 6  Feature-level Fusion
+Phase 7  Adaptive / Reliability Fusion
+Phase 8  小目标、Depth、类别不均衡等专项优化
+Phase 9  排行榜优化
+Phase 10  复赛 / 半决赛材料整理
+```
+
+## 9. 项目原则
+
+1. 正式训练集是唯一训练数据源。
+2. 测试集与训练集严格隔离。
+3. 固定 train / val 后，所有可比较实验统一使用同一划分。
+4. 正式实验统一编号为 `E001、E002……`。
+5. 一次实验尽量只改变一个主要变量。
+6. 正式训练前记录 Git commit 和实验配置。
+7. 先完成 RGB baseline，再进入三模态模型优化。
+8. 先基于数据统计和实验结果确定优化方向。
+9. `main` 保持稳定、可运行、可复现。

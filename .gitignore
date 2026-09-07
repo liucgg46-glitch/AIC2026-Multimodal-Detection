@@ -179,3 +179,37 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+
+# ============================================================
+# AIC2026 Multimodal Detection - project specific
+# ============================================================
+
+# Competition datasets / derived large data
+data/raw/
+data/processed/
+
+# Model weights and exported models
+weights/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.engine
+
+# Training outputs
+runs/
+
+# Generated submissions and visualizations
+outputs/submissions/
+outputs/visualization/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Keep data/splits/ under version control.
+# Keep outputs/analysis/ under version control when files are small
+# (e.g. CSV / JSON / Markdown summaries).
