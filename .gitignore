@@ -180,17 +180,24 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
-
 # ============================================================
 # AIC2026 Multimodal Detection - project specific
 # ============================================================
 
 # Competition datasets / derived large data
-data/raw/
-data/processed/
+# Ignore real files but keep directory skeleton via .gitkeep.
+data/raw/**
+!data/raw/**/
+!data/raw/**/.gitkeep
+
+data/processed/**
+!data/processed/**/
+!data/processed/**/.gitkeep
 
 # Model weights and exported models
-weights/
+weights/**
+!weights/**/
+!weights/**/.gitkeep
 *.pt
 *.pth
 *.ckpt
@@ -198,18 +205,25 @@ weights/
 *.engine
 
 # Training outputs
-runs/
+runs/**
+!runs/**/
+!runs/**/.gitkeep
 
 # Generated submissions and visualizations
-outputs/submissions/
-outputs/visualization/
+outputs/submissions/**
+!outputs/submissions/**/
+!outputs/submissions/**/.gitkeep
+
+outputs/visualization/**
+!outputs/visualization/**/
+!outputs/visualization/**/.gitkeep
+
+# Keep these under version control:
+# - data/splits/
+# - outputs/analysis/ (small CSV / JSON / Markdown summaries)
 
 # IDE / OS
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
-
-# Keep data/splits/ under version control.
-# Keep outputs/analysis/ under version control when files are small
-# (e.g. CSV / JSON / Markdown summaries).
