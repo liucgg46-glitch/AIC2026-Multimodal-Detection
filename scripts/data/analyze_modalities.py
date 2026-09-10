@@ -29,8 +29,16 @@ DEFAULT_LABEL_DIR = REPO_ROOT / "data" / "processed" / "train" / "labels_clean"
 DEFAULT_JSON = REPO_ROOT / "outputs" / "analysis" / "modalities_stats.json"
 DEFAULT_CSV = REPO_ROOT / "outputs" / "analysis" / "modalities_stats.csv"
 DEFAULT_REPORT = REPO_ROOT / "outputs" / "analysis" / "modalities_summary.md"
+DEFAULT_DEPTH_VISUALIZATION_DIR = REPO_ROOT / "outputs" / "visualization" / "depth_analysis"
 SPLIT_DIR = REPO_ROOT / "data" / "splits"
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg"}
+PREFERRED_DEPTH_VISUALIZATION_STEMS = (
+    "000002",
+    "003127",
+    "shuming_343_00000288",
+    "shuming_342_00000275",
+    "003125",
+)
 
 
 def portable_project_path(path: Path) -> str:
@@ -549,6 +557,218 @@ def normalize_depth_png(depth: np.ndarray) -> np.ndarray:
     return result
 
 
+def normalize_valid_values(values: np.ndarray, valid: np.ndarray) -> np.ndarray:
+    """Normalize valid analysis values to [0, 1] while leaving invalid pixels at zero."""
+    result = np.zeros(values.shape, dtype=np.float32)
+    if not np.any(valid):
+        return result
+    valid_values = values[valid].astype(np.float64, copy=False)
+    low = float(valid_values.min())
+    high = float(valid_values.max())
+    if high > low:
+        result[valid] = ((valid_values - low) / (high - low)).astype(np.float32)
+    else:
+        result[valid] = 1.0
+    return result
+
+
+def select_depth_visualization_stems(
+    rows: list[dict[str, Any]], val_sample_count: int
+) -> tuple[list[str], list[str]]:
+    """Select requested examples plus deterministic val zero-ratio quantiles."""
+    png_rows = {
+        str(row["stem"]): row
+        for row in rows
+        if row.get("depth_kind") == "png_uint16_single"
+    }
+    selected = [stem for stem in PREFERRED_DEPTH_VISUALIZATION_STEMS if stem in png_rows]
+    missing = [stem for stem in PREFERRED_DEPTH_VISUALIZATION_STEMS if stem not in png_rows]
+    val_rows = sorted(
+        (row for row in png_rows.values() if row.get("split") == "val"),
+        key=lambda row: (float(row["depth_zero_ratio"]), str(row["stem"])),
+    )
+    count = min(max(val_sample_count, 0), len(val_rows))
+    if count == 1:
+        quantile_indices = [len(val_rows) // 2]
+    elif count > 1:
+        quantile_indices = [round(index * (len(val_rows) - 1) / (count - 1)) for index in range(count)]
+    else:
+        quantile_indices = []
+    for target_index in quantile_indices:
+        candidate_indices = sorted(
+            range(len(val_rows)), key=lambda index: (abs(index - target_index), index)
+        )
+        for index in candidate_indices:
+            stem = str(val_rows[index]["stem"])
+            if stem not in selected:
+                selected.append(stem)
+                break
+    return selected, missing
+
+
+def write_png_depth_visualization(
+    stem: str,
+    visible_path: Path,
+    depth_path: Path,
+    output_dir: Path,
+) -> dict[str, Any]:
+    """Write a derived PNG Depth review figure without changing source arrays or files."""
+    visible = read_image(visible_path)
+    depth = read_image(depth_path)
+    if depth.ndim != 2 or depth.dtype != np.uint16:
+        raise ValueError(
+            f"Depth visualization requires uint16 single-channel PNG, got {depth.dtype} {depth.shape}"
+        )
+
+    valid = depth > 0
+    valid_count = int(np.count_nonzero(valid))
+    valid_ratio = valid_count / depth.size
+    zero_ratio = 1.0 - valid_ratio
+    valid_values = depth[valid].astype(np.float64, copy=False)
+    if valid_count:
+        p2, p98 = (float(value) for value in np.percentile(valid_values, (2, 98)))
+    else:
+        p2, p98 = 0.0, 0.0
+
+    raw_display = normalize_valid_values(depth, valid)
+    clipped = np.zeros(depth.shape, dtype=np.float32)
+    if valid_count:
+        clipped_values = np.clip(valid_values, p2, p98)
+        if p98 > p2:
+            clipped[valid] = ((clipped_values - p2) / (p98 - p2)).astype(np.float32)
+        else:
+            clipped[valid] = 1.0
+
+    # Log and inverse depth are derived visualization/preprocessing candidates, not physical depth.
+    log_values = np.zeros(depth.shape, dtype=np.float64)
+    inverse_values = np.zeros(depth.shape, dtype=np.float64)
+    if valid_count:
+        log_values[valid] = np.log1p(valid_values)
+        inverse_values[valid] = 1.0 / valid_values
+    log_display = normalize_valid_values(log_values, valid)
+    inverse_display = normalize_valid_values(inverse_values, valid)
+
+    def colorize(values: np.ndarray, colormap: int) -> np.ndarray:
+        scaled = np.clip(np.rint(values * 255.0), 0, 255).astype(np.uint8)
+        colored = cv2.applyColorMap(scaled, colormap)
+        colored[~valid] = 0
+        return colored
+
+    def panel(image: np.ndarray, title: str, subtitle: str = "") -> np.ndarray:
+        if image.ndim == 2:
+            image = cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_GRAY2BGR)
+        resized = cv2.resize(image, (640, 360), interpolation=cv2.INTER_AREA)
+        canvas = np.zeros((440, 640, 3), dtype=np.uint8)
+        canvas[80:, :] = resized
+        cv2.putText(canvas, title, (16, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.72, (255, 255, 255), 2)
+        if subtitle:
+            cv2.putText(
+                canvas,
+                subtitle,
+                (16, 62),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.52,
+                (205, 205, 205),
+                1,
+            )
+        return canvas
+
+    visible_bgr = (
+        visible[..., :3]
+        if visible.ndim == 3 and visible.shape[2] >= 3
+        else cv2.cvtColor(visible.astype(np.uint8), cv2.COLOR_GRAY2BGR)
+    )
+    valid_mask = np.where(valid, 255, 0).astype(np.uint8)
+    panels = [
+        panel(visible_bgr, "Visible reference"),
+        panel(
+            colorize(raw_display, cv2.COLORMAP_VIRIDIS),
+            f"Raw Depth (normalized display, {depth.dtype})",
+            f"min={int(depth.min())}, max={int(depth.max())}",
+        ),
+        panel(
+            valid_mask,
+            "Valid Mask (depth > 0)",
+            f"valid={valid_ratio:.2%}, zero={zero_ratio:.2%}",
+        ),
+        panel(
+            colorize(clipped, cv2.COLORMAP_VIRIDIS),
+            f"Percentile Depth (P2-P98, {depth.dtype})",
+            f"P2={p2:.1f}, P98={p98:.1f}",
+        ),
+        panel(
+            colorize(log_display, cv2.COLORMAP_VIRIDIS),
+            "Log Depth",
+            "valid-only log1p display",
+        ),
+        panel(
+            colorize(inverse_display, cv2.COLORMAP_MAGMA),
+            "Inverse Depth",
+            "valid-only 1/depth display",
+        ),
+    ]
+    figure = np.vstack((np.hstack(panels[:3]), np.hstack(panels[3:])))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / f"{stem}_depth_analysis.png"
+    if not cv2.imwrite(str(output_path), figure):
+        raise OSError(f"Failed to write image: {output_path}")
+    return {
+        "stem": stem,
+        "output_path": portable_project_path(output_path),
+        "valid_ratio": valid_ratio,
+        "zero_ratio": zero_ratio,
+        "p2": p2,
+        "p98": p98,
+    }
+
+
+def c4_depth_anomaly_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    png_rows = [row for row in rows if row.get("depth_kind") == "png_uint16_single"]
+    jpg_rows = [row for row in rows if row.get("depth_kind") == "jpg_uint8"]
+    near_all_zero = [
+        {"stem": row["stem"], "zero_ratio": row["depth_zero_ratio"]}
+        for row in png_rows
+        if float(row["depth_zero_ratio"]) >= 0.99
+    ]
+    all_black = [row["stem"] for row in png_rows if float(row["depth_max"]) == 0.0]
+    low_dynamic = sorted(
+        (
+            {
+                "stem": row["stem"],
+                "dynamic_range": float(row["depth_max"]) - float(row["depth_min"]),
+                "max": float(row["depth_max"]),
+            }
+            for row in png_rows
+        ),
+        key=lambda item: (item["dynamic_range"], item["stem"]),
+    )[:5]
+    outside_expected_range = [
+        row["stem"]
+        for row in png_rows
+        if float(row["depth_max"]) > 20000.0 or float(row["depth_max"]) < 300.0
+    ]
+    return {
+        "near_all_zero_threshold": 0.99,
+        "near_all_zero": near_all_zero,
+        "all_black": all_black,
+        "lowest_dynamic_range": low_dynamic,
+        "outside_expected_nonzero_max_range": outside_expected_range,
+        "png_count": len(png_rows),
+        "png_dtypes": dict(Counter(str(row["depth_dtype"]) for row in png_rows)),
+        "png_shapes": dict(Counter(str(row["depth_shape"]) for row in png_rows)),
+        "png_channels": dict(Counter(str(row["depth_channels"]) for row in png_rows)),
+        "jpg_count": len(jpg_rows),
+        "jpg_dtypes": dict(Counter(str(row["depth_dtype"]) for row in jpg_rows)),
+        "jpg_shapes": dict(Counter(str(row["depth_shape"]) for row in jpg_rows)),
+        "jpg_channels": dict(Counter(str(row["depth_channels"]) for row in jpg_rows)),
+        "unexpected_representations": [
+            {"stem": row["stem"], "kind": row["depth_kind"]}
+            for row in rows
+            if row.get("depth_kind") not in {"png_uint16_single", "jpg_uint8"}
+        ],
+    }
+
+
 def registration_gray(image: np.ndarray, is_png_depth: bool) -> np.ndarray:
     if is_png_depth:
         return normalize_depth_png(image)
@@ -880,7 +1100,8 @@ def registration_markdown(name: str, stats: dict[str, Any]) -> list[str]:
     return lines
 
 
-def generate_report(summary: dict[str, Any]) -> str:
+def generate_report(summary: dict[str, Any], c4_review: dict[str, Any] | None = None) -> str:
+    c4_review = c4_review or {}
     scope = summary["scope"]
     matching = summary["matching"]
     basic = summary["basic"]
@@ -889,6 +1110,28 @@ def generate_report(summary: dict[str, Any]) -> str:
     jpg = summary["depth"]["jpg_uint8"]
     registration = summary["registration"]
     targets = summary["near_far"]
+    c4_visualizations = c4_review.get("visualizations", [])
+    c4_anomalies = c4_review.get("anomalies", {})
+    visualization_outputs = ", ".join(
+        f"`{item['output_path']}`" for item in c4_visualizations
+    ) or "not generated in this run"
+    near_all_zero = ", ".join(
+        f"{item['stem']} ({fmt_percent(item['zero_ratio'])})"
+        for item in c4_anomalies.get("near_all_zero", [])
+    ) or "none"
+    all_black = ", ".join(c4_anomalies.get("all_black", [])) or "none"
+    lowest_dynamic = ", ".join(
+        f"{item['stem']} ({fmt_number(item['dynamic_range'])})"
+        for item in c4_anomalies.get("lowest_dynamic_range", [])
+    ) or "not evaluated"
+    unexpected_max = ", ".join(
+        c4_anomalies.get("outside_expected_nonzero_max_range", [])
+    ) or "none"
+    unexpected_representations = ", ".join(
+        f"{item['stem']} ({item['kind']})"
+        for item in c4_anomalies.get("unexpected_representations", [])
+    ) or "none"
+    missing_preferred = ", ".join(c4_review.get("missing_preferred", [])) or "none"
     lines = [
         "# AIC2026 Multimodal Modalities Summary",
         "",
@@ -1056,13 +1299,30 @@ def generate_report(summary: dict[str, Any]) -> str:
             "- JPG: treat as an independent uint8 encoded representation with its own normalization. Do not interpret values as millimeters.",
             "- A training pipeline that silently mixes PNG uint16 and JPG uint8 Depth under one normalization is an engineering risk.",
             "",
-            "## 14. Fusion preprocessing suggestions",
+            "## 14. C4 Depth visualization and anomaly review",
+            "",
+            "- The C4 figure layout is 2x3: Visible reference, normalized raw Depth, valid mask, P2-P98 percentile Depth, valid-only log1p Depth, and valid-only inverse Depth.",
+            "- All four physical-depth-derived views apply only to single-channel uint16 PNG Depth. Invalid zero pixels remain explicitly masked and are never treated as valid near-distance measurements.",
+            f"- Generated representative outputs: {visualization_outputs}.",
+            f"- Requested representative stems unavailable in the selected split: {missing_preferred}.",
+            f"- Near-all-zero PNG samples (zero ratio >= {fmt_percent(c4_anomalies.get('near_all_zero_threshold'))}): {near_all_zero}.",
+            f"- Completely black PNG samples: {all_black}.",
+            f"- Five smallest observed PNG dynamic ranges (stem, max-min): {lowest_dynamic}.",
+            f"- PNG samples with maximum below 300 or above 20000: {unexpected_max}.",
+            f"- PNG representation check: {c4_anomalies.get('png_count', 0)} files; dtypes {markdown_counter(c4_anomalies.get('png_dtypes', {}))}; channels {markdown_counter(c4_anomalies.get('png_channels', {}))}; shapes {markdown_counter(c4_anomalies.get('png_shapes', {}))}.",
+            f"- JPG representation check: {c4_anomalies.get('jpg_count', 0)} files; dtypes {markdown_counter(c4_anomalies.get('jpg_dtypes', {}))}; channels {markdown_counter(c4_anomalies.get('jpg_channels', {}))}; shapes {markdown_counter(c4_anomalies.get('jpg_shapes', {}))}; physical units remain unknown.",
+            f"- Unexpected PNG/JPG Depth representations: {unexpected_representations}.",
+            "- The valid mask directly exposes missing-depth regions. Percentile clipping improves display contrast while preserving the invalid mask; log-depth compresses long-range variation; inverse depth emphasizes near-range variation. These are candidate representations for controlled experiments, not replacements for the source Depth.",
+            "- For E003 Depth-only ablation, validate percentile normalization, log-depth, inverse-depth, and Depth plus valid-mask inputs. Compare single-channel input, three-channel replication, an extra valid-mask channel, [0,1] normalization, and a fixed invalid value. No option is claimed to improve mAP without experiment evidence.",
+            "- JPG Depth requires separate uint8 normalization and must not share PNG millimeter-scale transforms or thresholds.",
+            "",
+            "## 15. Fusion preprocessing suggestions",
             "",
             "- Resize, crop, flip, affine and perspective parameters must be shared exactly across Visible, IR and Depth.",
             "- Modality-specific photometric normalization may differ, but geometry must stay synchronized.",
             "- Carry IR edge-band masks and PNG invalid-depth masks where useful, and evaluate robustness to residual misalignment.",
             "",
-            "## 15. Current limitations and unsupported conclusions",
+            "## 16. Current limitations and unsupported conclusions",
             "",
             "- Automatic registration is a translation-only estimate on a deterministic sample, not a dense calibration or proof of pixel-perfect alignment.",
             "- Unreliable matches are not converted into precise offsets.",
@@ -1091,6 +1351,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-json", type=Path, default=DEFAULT_JSON)
     parser.add_argument("--output-csv", type=Path, default=DEFAULT_CSV)
     parser.add_argument("--output-report", type=Path, default=DEFAULT_REPORT)
+    parser.add_argument(
+        "--depth-visualizations",
+        action="store_true",
+        help="Write representative uint16 PNG Depth analysis figures.",
+    )
+    parser.add_argument(
+        "--depth-visualization-dir", type=Path, default=DEFAULT_DEPTH_VISUALIZATION_DIR
+    )
+    parser.add_argument(
+        "--depth-visualization-val-samples",
+        type=int,
+        default=5,
+        help="Deterministic val zero-ratio quantile samples in addition to requested stems.",
+    )
     parser.add_argument("--progress-every", type=int, default=100)
     parser.add_argument("--no-write", action="store_true", help="Run analysis without writing reports.")
     return parser.parse_args()
@@ -1375,6 +1649,31 @@ def main() -> None:
         "errors": errors,
     }
 
+    c4_review: dict[str, Any] = {
+        "visualizations": [],
+        "missing_preferred": [],
+        "anomalies": c4_depth_anomaly_summary(rows),
+    }
+    if args.depth_visualizations:
+        visualization_stems, missing_preferred = select_depth_visualization_stems(
+            rows, args.depth_visualization_val_samples
+        )
+        c4_review["missing_preferred"] = missing_preferred
+        for stem in visualization_stems:
+            try:
+                c4_review["visualizations"].append(
+                    write_png_depth_visualization(
+                        stem,
+                        visible_map[stem],
+                        depth_map[stem],
+                        args.depth_visualization_dir,
+                    )
+                )
+            except (OSError, ValueError, cv2.error) as error:
+                message = f"{stem}: failed to write C4 Depth visualization: {error}"
+                errors.append(message)
+                warnings.warn(message, stacklevel=2)
+
     if not args.no_write:
         for path in (args.output_json, args.output_csv, args.output_report):
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -1386,7 +1685,9 @@ def main() -> None:
             writer = csv.DictWriter(stream, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(rows)
-        args.output_report.write_text(generate_report(summary), encoding="utf-8", newline="\n")
+        args.output_report.write_text(
+            generate_report(summary, c4_review), encoding="utf-8", newline="\n"
+        )
         print(f"Wrote: {args.output_json}")
         print(f"Wrote: {args.output_csv}")
         print(f"Wrote: {args.output_report}")
@@ -1400,6 +1701,7 @@ def main() -> None:
                 "registration_attempts": len(registration_stems),
                 "registration_reliable_ir": summary["registration"]["visible_ir"]["reliable"],
                 "registration_reliable_depth": summary["registration"]["visible_depth"]["reliable"],
+                "depth_visualizations": len(c4_review["visualizations"]),
                 "warnings": len(messages),
                 "errors": len(errors),
             },
