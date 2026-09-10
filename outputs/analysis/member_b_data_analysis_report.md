@@ -414,3 +414,46 @@ outputs/analysis/clean_label_validation/
 ```
 
 本处理规则是团队内部训练预处理标准，不是赛事官方要求。`data/processed/` 已被 Git 忽略，其他成员应从各自的官方训练集运行同一脚本生成标签副本，不能上传比赛数据。
+
+## 12. 人工可视化复核与三模态对齐新发现
+
+人工复核结论单独记录于 `outputs/analysis/label_visual_review.csv`。当前已确认：轻微边缘越界可保留；5 个字段范围错误只在派生标签中裁剪；空标签 `shuming_102_00000228` 为合法负样本；类别判断必须结合 `class_id`，例如 `001989` 第 7 行为 `seat`，不是 `person`。
+
+人工复核另发现 `000003_026_00000001` 第 1 行框完整覆盖货车，但官方类别为 `0: person`；同图第 2 行 `person` 正确覆盖远处行人，第 3 行 `6: car` 正确覆盖右侧车辆，因此第 1 行确认为官方语义类别错标。该样本记为 `FAIL_CLASS_MISMATCH`，并已仅在派生标签中执行 `0 -> 6` 修正，原始标签未改动。
+
+样本 `003817` 显示，三模态文件的 stem、扩展名和图像尺寸一致，只能证明文件级配对完整，不能证明所有目标都达到逐像素严格对齐。该样本的 Visible 标签框覆盖左侧近距离人物，但 Infrared 左侧存在黑色无效区域，人物相对 Visible 明显向右偏移，Depth 也存在残余视差。因此：
+
+- 标签几何与类别复核以官方标签所匹配的 Visible 画面为主要依据；
+- Infrared 与 Depth 用于确认目标存在和记录模态偏移，不能据此擅自改写官方 bbox；
+- `003817` 记为标签 `PASS_WITH_ALIGNMENT_WARNING`；
+- 将黑边、有效视场和近/远距离目标偏移统计交给成员 C 的三模态配准专项分析；
+- 在对齐规律明确前，不采用要求三模态逐像素重合的早期融合假设。
+
+当前 `000042` 第 28 行仍记为 `REVIEW`：右侧目标只部分进入画面，暂不删除、暂不裁剪，等待原始全图或相关序列证据。所有原始图像和标签均未修改。
+
+## 13. 人工确认的语义类别修正已写入 `labels_clean`
+
+经人工查看 Visible 原图并由成员 B 确认，以下类别错标已写入派生目录 `data/processed/train/labels_clean`，bbox 坐标保持不变：
+
+- `000003_026_00000001.txt` L1：`0 person -> 6 car`（框内为大型货车）；
+- `000005_026_00000001.txt` L1～L4：`6 car -> 0 person`（四个框均为人物）；
+- `002517.txt` L1～L7：`4 sign -> 8 light`（七个框均为道路照明灯杆/灯具）；
+- `002517.txt` L8 为唯一交通标志牌，保持 `4 sign`。
+
+重新生成后的审计结果：标签文件 2000 个、有效目标 15194 个、类别修正 12 个、字段错误 0、保留警告 59、`passed=true`。更新后的类别计数以 `clean_label_validation/class_counts.csv` 为准。`clean_label_changes.csv` 当前共记录 18 项变更：5 个越界框裁剪、1 个完全重复框删除、12 个已确认类别修正。
+
+脚本在生成前后校验全部官方源标签 SHA256，结果 `source_files_unchanged=true`；本次只更新派生标签，没有改动 `data/raw`。后续每发现并确认一项语义错标，应将规则加入 `prepare_clean_labels.py`，重新生成并再次运行 `analyze_labels.py`，不得直接手工覆盖官方标签。
+
+## 14. 全量肉眼审核完成
+
+成员 B 已完成 2000 张 Visible 训练图像的逐图审核，并将结果登记到 `outputs/full_visible_review/review_manifest.csv`：
+
+- `PASS`：1995 张；
+- `PASS_WITH_CLEAN_FIX`：1 张；
+- `PASS_WITH_ALIGNMENT_WARNING`：1 张；
+- `FAIL_CLASS`：3 张；
+- `PENDING` / `REVIEW`：0 张。
+
+其中 3 个 `FAIL_CLASS` 状态用于保留官方原始标签错误的审计证据，对应的 12 个错误类别行均已在 `labels_clean` 中修正。`000042` 的画面边界截断目标已按有效实例结案并保留。最终清洗标签再次通过代码检查：2000 个文件、15194 个有效目标、0 个错误、59 个保留边界警告。
+
+至此，成员 B 的正式训练数据验收、固定 split、统计分析、代码检查和全量人工语义审核均已完成。下一步是提交本轮新增脚本、审计结果和报告并推送 `feature/data-analysis`，更新现有 Pull Request；成员 A、C 合并后在各自本地运行同一清洗脚本生成 `labels_clean`。

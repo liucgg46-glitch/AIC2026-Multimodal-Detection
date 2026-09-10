@@ -1,11 +1,11 @@
 """Create a minimally corrected AIC2026 label copy without editing data/raw.
 
 Only explicitly reviewed rows are changed: five invalid YOLO boxes are clipped
-to the image boundary, one exact duplicate is omitted, and five visually
-confirmed class mismatches are reclassified. All other rows, including valid
-boxes whose corners extend outside the image, are copied verbatim. The script
-is deterministic and verifies that source-file hashes do not change while it
-runs.
+to the image boundary, one exact duplicate is omitted, and twelve visually
+confirmed class mismatches across three images are reclassified. All other
+rows, including valid boxes whose corners extend outside the image, are copied
+verbatim. The script is deterministic and verifies that source-file hashes do
+not change while it runs.
 """
 
 from __future__ import annotations
@@ -188,8 +188,8 @@ def main() -> None:
         writer.writerows(changes)
 
     summary = {
-        "source_dir": str(SOURCE_DIR),
-        "output_dir": str(OUTPUT_DIR),
+        "source_dir": SOURCE_DIR.relative_to(REPO_ROOT).as_posix(),
+        "output_dir": OUTPUT_DIR.relative_to(REPO_ROOT).as_posix(),
         "source_label_files": len(source_paths),
         "output_label_files": len(output_paths),
         "clipped_invalid_boxes": len(applied_clip_lines),
