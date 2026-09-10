@@ -1101,242 +1101,238 @@ def registration_markdown(name: str, stats: dict[str, Any]) -> list[str]:
 
 
 def generate_report(summary: dict[str, Any], c4_review: dict[str, Any] | None = None) -> str:
+    """Render the reproducible C5 Chinese report from formal statistics and fixed guidance."""
     c4_review = c4_review or {}
     scope = summary["scope"]
     matching = summary["matching"]
     basic = summary["basic"]
     infrared = summary["infrared"]
+    ir_basic = basic["infrared"]
     png = summary["depth"]["png_uint16_single"]
     jpg = summary["depth"]["jpg_uint8"]
-    registration = summary["registration"]
+    registration_ir = summary["registration"]["visible_ir"]
+    registration_depth = summary["registration"]["visible_depth"]
     targets = summary["near_far"]
-    c4_visualizations = c4_review.get("visualizations", [])
-    c4_anomalies = c4_review.get("anomalies", {})
-    visualization_outputs = ", ".join(
-        f"`{item['output_path']}`" for item in c4_visualizations
-    ) or "not generated in this run"
-    near_all_zero = ", ".join(
-        f"{item['stem']} ({fmt_percent(item['zero_ratio'])})"
-        for item in c4_anomalies.get("near_all_zero", [])
-    ) or "none"
-    all_black = ", ".join(c4_anomalies.get("all_black", [])) or "none"
-    lowest_dynamic = ", ".join(
-        f"{item['stem']} ({fmt_number(item['dynamic_range'])})"
-        for item in c4_anomalies.get("lowest_dynamic_range", [])
-    ) or "not evaluated"
-    unexpected_max = ", ".join(
-        c4_anomalies.get("outside_expected_nonzero_max_range", [])
-    ) or "none"
-    unexpected_representations = ", ".join(
-        f"{item['stem']} ({item['kind']})"
-        for item in c4_anomalies.get("unexpected_representations", [])
-    ) or "none"
-    missing_preferred = ", ".join(c4_review.get("missing_preferred", [])) or "none"
+    near_group = targets["physical_depth_groups"]["near"]
+    far_group = targets["physical_depth_groups"]["far"]
+    thresholds = targets["physical_depth_thresholds"]
+    anomalies = c4_review.get("anomalies", {})
+
+    counts = matching["file_counts"]
+    visible = basic["visible"]
+    depth = basic["depth"]
+    top_zero_stems = [item["stem"] for item in png["highest_zero_ratio_stems"][:4]]
+    near_all_zero = anomalies.get("near_all_zero", [])
+    lowest_dynamic = anomalies.get("lowest_dynamic_range", [])
+    all_black = anomalies.get("all_black", [])
+    unexpected = anomalies.get("unexpected_representations", [])
+    unexpected_max = anomalies.get("outside_expected_nonzero_max_range", [])
+    primary_near_zero = (
+        f"`{near_all_zero[0]['stem']}`，zero ratio 约 "
+        f"{fmt_percent(near_all_zero[0]['zero_ratio'])}。"
+        if near_all_zero
+        else "未发现。"
+    )
+    other_high_zero = "、".join(f"`{stem}`" for stem in top_zero_stems[1:]) or "未发现"
+    minimum_dynamic = (
+        f"`{lowest_dynamic[0]['stem']}`，动态范围为 "
+        f"{fmt_number(lowest_dynamic[0]['dynamic_range'], 0)}。"
+        if lowest_dynamic
+        else "未评估。"
+    )
+
     lines = [
-        "# AIC2026 Multimodal Modalities Summary",
+        "# AIC2026 多模态数据分析报告",
         "",
-        "> Measurement results describe the selected local dataset. Engineering suggestions are hypotheses for later experiments and are not claims of mAP improvement.",
+        "本报告汇总成员 C 对 Visible、Infrared 与 Depth 数据的 C1～C4 检查结果。数值以 `outputs/analysis/modalities_stats.json` 的正式全量统计为准。实测结果、工程解释与后续实验假设在文中分别说明；任何预处理或融合方案均需通过固定划分上的受控实验验证，本文不对 mAP 提升作预判。",
         "",
-        "Official raw labels: `data/raw/train/labels/`",
+        "## 1. 数据范围与约束",
         "",
-        "Clean labels used by this analysis: `data/processed/train/labels_clean/`",
+        "**实测结果**",
         "",
-        "Old path `data/raw/train/labels/labels/` is not used.",
+        f"- Train 数据共 {scope['analyzed_stems']} 组；Visible、Infrared、Depth 与 `labels_clean` 的 filename stem 一一对应，共同 stem 和并集均为 {matching['common_stems']}，未发现缺失或重复 stem。",
+        f"- 官方原始标签位于 `data/raw/train/labels/`，共 {counts['raw_labels']} 个 TXT；旧路径 `data/raw/train/labels/labels/` 当前不使用。",
+        "- Bbox、near/far 和目标级分析统一使用 `data/processed/train/labels_clean/`。官方原始标签未被修改。",
+        f"- 固定划分为 `data/splits/train.txt` {scope['fixed_train_count']} 组、`data/splits/val.txt` {scope['fixed_val_count']} 组，二者无重叠，不重新随机划分。",
+        "- `PHASE_1_1000` 不参与训练、验证、调参或人工标注。",
         "",
-        "## 1. Data scope and fixed split",
+        "**工程约束**",
         "",
-        f"- Split: `{scope['split']}`; analyzed stems: {scope['analyzed_stems']}.",
-        f"- Fixed train/val counts: {scope['fixed_train_count']}/{scope['fixed_val_count']}; overlap: {scope['fixed_split_overlap']}.",
-        f"- Registration is a deterministic format-balanced sample: {scope['registration_sample_count']} stems (seed {scope['seed']}).",
-        "- No new train/val partition is created.",
+        "- `data/raw/` 始终只读；分析派生文件写入 `outputs/analysis/` 或 `outputs/visualization/`。",
+        "- 所有后续 E001～E006 实验必须沿用同一固定 train/val split，保证比较口径一致。",
+        "- Visible GT bbox 的坐标基准始终是官方 Visible 图像，不得依据 IR 或 Depth 的残余偏移修改标注。",
         "",
-        "## 2. Label paths",
+        "## 2. 三模态基础对应关系",
         "",
-        f"- Raw label files: {matching['file_counts']['raw_labels']}.",
-        f"- Clean label files: {matching['file_counts']['labels_clean']}.",
-        "- Bbox and target-depth analysis use only `labels_clean`.",
+        "| 模态 | 文件数 | 扩展名 | dtype | shape | 通道数 |",
+        "|---|---:|---|---|---|---:|",
+        f"| Visible | {counts['visible']} | PNG {visible['suffix_distribution']['.png']}，JPG {visible['suffix_distribution']['.jpg']} | uint8 | 1080×1920×3：{visible['shape_distribution']['1080x1920x3']}；360×640×3：{visible['shape_distribution']['360x640x3']} | 3 |",
+        f"| Infrared | {counts['infrared']} | PNG {ir_basic['suffix_distribution']['.png']}，JPG {ir_basic['suffix_distribution']['.jpg']} | uint8 | 1080×1920×3：{ir_basic['shape_distribution']['1080x1920x3']}；360×640×3：{ir_basic['shape_distribution']['360x640x3']} | 3 |",
+        f"| Depth | {counts['depth']} | PNG {summary['depth']['png_file_count']}，JPG {summary['depth']['jpg_file_count']} | PNG uint16；JPG uint8 | PNG 1080×1920；JPG 360×640×3 | PNG 1；JPG 3 |",
         "",
-        "## 3. Basic modality statistics",
+        f"三模态 width 和 height 一致率均为 {fmt_percent(matching['width_agreement_ratio'], 0)}。该结果仅说明同一 stem 的数组宽高一致，不能证明 RGB/Visible、Infrared 与 Depth 已达到逐像素严格配准。黑边、有效视场差异、残余位移以及有限的自动配准可靠率均表明：**尺寸一致不等于像素级严格对齐**。",
         "",
-        "| Modality | Files | Suffixes | Dtypes | Shapes | Channels |",
-        "|---|---:|---|---|---|---|",
+        "## 3. Infrared 数据特性",
+        "",
+        f"全部 {counts['infrared']} 张 Infrared 均为 uint8 三通道图像，全局数值范围为 {fmt_number(infrared['global_pixels']['min'], 0)}～{fmt_number(infrared['global_pixels']['max'], 0)}，全局均值为 {fmt_number(infrared['global_pixels']['mean'])}，标准差为 {fmt_number(infrared['global_pixels']['std'])}。",
+        "",
+        "| 通道对 | 平均绝对差 mean | median | P95 | max |",
+        "|---|---:|---:|---:|---:|",
     ]
-    for name in ("visible", "infrared", "depth"):
-        item = basic[name]
+    for label, key in (("B/G", "B_G"), ("B/R", "B_R"), ("G/R", "G_R")):
+        item = infrared["channel_mean_absolute_difference"][key]
         lines.append(
-            f"| {name} | {item['files']} | {markdown_counter(item['suffix_distribution'])} | "
-            f"{markdown_counter(item['dtype_distribution'])} | {markdown_counter(item['shape_distribution'])} | "
-            f"{markdown_counter(item['channel_distribution'])} |"
+            f"| {label} | {fmt_number(item['mean'])} | {fmt_number(item['median'])} | "
+            f"{fmt_number(item['p95'])} | {fmt_number(item['max'])} |"
         )
     lines.extend(
         [
             "",
-            f"- Common Visible/Infrared/Depth/clean-label stems: {matching['common_stems']}.",
-            f"- Three-modality width agreement: {fmt_percent(matching['width_agreement_ratio'])}.",
-            f"- Three-modality height agreement: {fmt_percent(matching['height_agreement_ratio'])}.",
-            "- Safety conclusion: equal width and height establish dimension agreement only; they do not establish strict pixel-level RGB/Visible, Infrared and Depth registration. Residual offsets, black borders, effective-field-of-view differences and automatic-registration reliability show that size agreement does not imply direct pixel correspondence.",
+            f"**结论：** Infrared 三通道高度相似，但并非逐像素完全相同。正式统计记录了 {infrared['channel_difference_outlier_count']} 个 Tukey 通道差异异常样本；这些样本是后续人工复核对象，不能据此直接判定为错误数据或自动删除。",
             "",
-            "## 4. Infrared dtype, channels and distribution",
+            "## 4. Infrared 黑边与有效视场",
             "",
-            f"- Three-channel ratio: {fmt_percent(infrared['three_channel_ratio'])}; single-channel ratio: {fmt_percent(infrared['single_channel_ratio'])}.",
-            f"- Global pixel range/mean/std: {fmt_number(infrared['global_pixels']['min'])} / {fmt_number(infrared['global_pixels']['max'])} / {fmt_number(infrared['global_pixels']['mean'])} / {fmt_number(infrared['global_pixels']['std'])}.",
-            f"- B/G mean absolute difference: {compact_distribution(infrared['channel_mean_absolute_difference']['B_G'])}.",
-            f"- B/R mean absolute difference: {compact_distribution(infrared['channel_mean_absolute_difference']['B_R'])}.",
-            f"- G/R mean absolute difference: {compact_distribution(infrared['channel_mean_absolute_difference']['G_R'])}.",
-            f"- Tukey channel-difference outliers: {infrared['channel_difference_outlier_count']} total; up to 20 are stored in JSON.",
+            f"- 黑边出现率：{fmt_percent(ir_basic['border_occurrence_ratio'])}。",
+            f"- 有效视场比例：均值 {fmt_percent(ir_basic['effective_fov_ratio']['mean'])}，中位数 {fmt_percent(ir_basic['effective_fov_ratio']['median'])}。",
+            f"- 右侧连续低值边带宽度：中位数 {fmt_number(ir_basic['border_width_px']['right']['median'], 0)} px。",
             "",
-            "## 5. Black borders and effective field of view",
+            "黑边测量基于图像边缘连续灰度低值区域，普通 uint8 图像的低值阈值为灰度不高于 8；该指标用于描述边缘带，不代表所有暗像素均无效。较高的黑边出现率和有效视场变化会影响直接像素级融合。原图不应被独立裁切或覆盖；后续可将边缘 mask 作为受控实验输入，并保证涉及几何变换时三模态参数完全同步。",
             "",
-            "Black-border measurement uses median continuous low-value runs from each image edge; fully low scan lines are excluded from the perpendicular side estimate. For ordinary uint8 imagery, low means grayscale <= 8. For PNG uint16 Depth, it means zero. This is an engineering measurement of edge bands, not proof that every dark pixel is invalid.",
+            "## 5. PNG Depth 数据特性",
             "",
-            "| Modality | Border occurrence | Effective FOV ratio | Low/zero pixel ratio |",
-            "|---|---:|---|---|",
+            f"{summary['depth']['png_file_count']} 张 PNG Depth 均以 `cv2.IMREAD_UNCHANGED` 读取，实测为 shape `1080×1920`、单通道 uint16，数值范围 {fmt_number(png['all_pixels']['min'], 0)}～{fmt_number(png['all_pixels']['max'], 0)}。全像素均值为 {fmt_number(png['all_pixels']['mean'])}，中位数为 {fmt_number(png['all_pixels']['median'], 0)}。",
+            "",
+            "| 指标 | 结果 |",
+            "|---|---:|",
+            f"| 全局 zero ratio | {fmt_percent(png['global_zero_ratio'], 4)} |",
+            f"| 每图 zero ratio median | {fmt_percent(png['per_image_zero_ratio']['median'], 4)} |",
+            f"| 每图 zero ratio P90 | {fmt_percent(png['per_image_zero_ratio']['p90'], 4)} |",
+            f"| 每图 zero ratio P95 | {fmt_percent(png['per_image_zero_ratio']['p95'], 4)} |",
+            f"| 每图 zero ratio max | {fmt_percent(png['per_image_zero_ratio']['max'], 4)} |",
+            f"| 全像素 `<300`，包含零值 | {fmt_percent(png['all_pixel_range_ratios']['below_300_including_zero'], 4)} |",
+            f"| 非零有效像素 `<300` | {fmt_percent(png['nonzero_below_300_ratio'], 4)} |",
+            f"| 全像素 `300～20000`，含边界 | {fmt_percent(png['all_pixel_range_ratios']['range_300_to_20000_inclusive'], 4)} |",
+            f"| 全像素 `>20000` | {fmt_percent(png['all_pixel_range_ratios']['above_20000'], 4)} |",
+            "",
+            "Depth 中的零值是**无效深度候选**，不能解释为真实 0 mm，也不能把包含大量零值的 `<300` 全像素比例解释为真实近距离比例。物理范围分析必须将 zero ratio 与非零有效像素中的 `<300` 比例分开报告。",
+            "",
+            "## 6. JPG Depth 数据特性",
+            "",
+            f"{summary['depth']['jpg_file_count']} 张 JPG Depth 均为 shape `360×640×3`、uint8 三通道表示，全局范围 {fmt_number(jpg['global_pixels']['min'], 0)}～{fmt_number(jpg['global_pixels']['max'], 0)}，全局均值 {fmt_number(jpg['global_pixels']['mean'])}，标准差 {fmt_number(jpg['global_pixels']['std'])}。",
+            "",
+            "| 指标 | 结果 |",
+            "|---|---:|",
+            f"| 每图 zero ratio mean | {fmt_percent(jpg['per_image_zero_ratio']['mean'], 4)} |",
+            f"| 每图 zero ratio median | {fmt_percent(jpg['per_image_zero_ratio']['median'], 4)} |",
+            f"| 动态范围 median | {fmt_number(jpg['per_image_dynamic_range']['median'], 0)} |",
+            f"| 灰度熵 mean | {fmt_number(jpg['per_image_grayscale_entropy_bits']['mean'])} bits |",
+            f"| 灰度熵 median | {fmt_number(jpg['per_image_grayscale_entropy_bits']['median'])} bits |",
+            "",
+            "JPG Depth 的物理深度映射无法仅从当前数据确认。JPG 的 0～255 不得解释为毫米，不适用 `<300 mm`、`300～20000 mm` 或 `>20000 mm` 阈值。PNG uint16 与 JPG uint8 是两种显著不同的数据表示，不能直接共享同一套物理深度解释或归一化流程。",
+            "",
+            "## 7. C4 Depth 专项可视化",
+            "",
+            "C4 已对代表性 PNG uint16 Depth 生成 2×3 分析图，输出位于 `outputs/visualization/depth_analysis/`。布局包括 Visible 参考图、Raw/Normalized Depth、Valid Mask、Percentile-Clipped Depth、Log Depth 与 Inverse Depth。",
+            "",
+            "| 可视化 | 处理方式与用途 |",
+            "|---|---|",
+            "| Valid Mask | 使用 `depth > 0` 标记有效区域，直接检查无效区域分布和 zero ratio。 |",
+            "| Percentile-Clipped | 仅用非零像素计算 P2～P98，裁剪后归一化；用于改善显示对比度，并作为候选归一化方案。 |",
+            "| Log Depth | 仅对有效像素计算 `log1p(depth)` 并独立归一化；用于压缩远距离动态范围。 |",
+            "| Inverse Depth | 仅对有效像素计算 `1/depth`，避免除零后独立归一化；用于突出近距离结构变化。 |",
+            "",
+            "四类派生结果均保持无效零值区域为黑色，仅用于分析或候选预处理，不改变原始 Depth，也不是已经验证的最优训练方案。代表性输出覆盖指定高 zero ratio 样本及按 zero ratio 分位确定性选取的 val 样本。",
+            "",
+            "## 8. 三模态空间配准分析",
+            "",
+            f"配准统计采用 seed {scope['seed']} 的 {scope['registration_sample_count']} 个确定性、格式平衡样本。方法为受约束的局部边缘相关，仅估计有限搜索窗口内的图像级平移；低置信、峰值模糊或边界结果不进入可靠位移汇总。",
+            "",
+            "| 配准对 | 可靠结果 | 可靠率 | 位移 mean | median | P90 | P95 |",
+            "|---|---:|---:|---:|---:|---:|---:|",
+            f"| Visible ↔ IR | {registration_ir['reliable']}/{registration_ir['attempted']} | {fmt_percent(registration_ir['reliable_ratio'])} | {fmt_number(registration_ir['magnitude_px']['mean'])} px | {fmt_number(registration_ir['magnitude_px']['median'])} px | {fmt_number(registration_ir['magnitude_px']['p90'])} px | {fmt_number(registration_ir['magnitude_px']['p95'])} px |",
+            f"| Visible ↔ Depth | {registration_depth['reliable']}/{registration_depth['attempted']} | {fmt_percent(registration_depth['reliable_ratio'])} | {fmt_number(registration_depth['magnitude_px']['mean'])} px | {fmt_number(registration_depth['magnitude_px']['median'])} px | {fmt_number(registration_depth['magnitude_px']['p90'])} px | {fmt_number(registration_depth['magnitude_px']['p95'])} px |",
+            "",
+            "自动配准可靠率有限，这些结果只能作为残余偏移线索，不能外推为全部样本都存在某个固定平移，也不能证明逐像素严格对齐。可靠率本身还受到跨模态外观差异、黑边和有效视场的影响。任何估计偏移均不得用于移动或修改 Visible GT bbox、重写 `labels_clean` 或重新生成官方标注。",
+            "",
+            "## 9. Near/Far 目标分析",
+            "",
+            f"Bbox 和目标级统计使用 `labels_clean`。clean-label 目标共 {targets['bbox_area_ratio']['count']} 个，其中 {targets['physical_target_depth']['count']} 个获得可用的 PNG 框内物理深度中位数，覆盖率为 {fmt_percent(targets['physical_depth_coverage'])}。Near/Far 阈值来自有效 PNG 目标深度的 33.3% 与 66.7% 分位数：Near 不高于 {fmt_number(thresholds['near_max'], 2)} mm，Far 不低于 {fmt_number(thresholds['far_min'], 2)} mm，两组各 {near_group['target_count']} 个目标；JPG 样本不参与物理 Near/Far 分组。",
+            "",
+            "| 分组 | 目标数 | IR 位移 median / P90 | Depth 位移 median / P90 |",
+            "|---|---:|---:|---:|",
+            f"| Near | {near_group['target_count']} | {fmt_number(near_group['reg_ir']['median'], 2)} / {fmt_number(near_group['reg_ir']['p90'], 2)} px | {fmt_number(near_group['reg_depth']['median'], 2)} / {fmt_number(near_group['reg_depth']['p90'], 2)} px |",
+            f"| Far | {far_group['target_count']} | {fmt_number(far_group['reg_ir']['median'], 2)} / {fmt_number(far_group['reg_ir']['p90'], 2)} px | {fmt_number(far_group['reg_depth']['median'], 2)} / {fmt_number(far_group['reg_depth']['p90'], 2)} px |",
+            "",
+            "这些位移是目标继承的**可靠图像级平移估计**，不是 bbox 内的局部配准或目标视差测量。当前结果不足以断言距离越近或越远必然导致更大的配准误差。",
+            "",
+            "## 10. 代表性异常样本",
+            "",
+            f"- PNG near-all-zero：{primary_near_zero}",
+            f"- 其他高 zero ratio 代表样本：{other_high_zero}。",
+            f"- 最小动态范围 PNG：{minimum_dynamic}",
+            f"- 全黑 PNG：{'、'.join(f'`{stem}`' for stem in all_black) if all_black else '未发现'}。",
+            f"- 非 uint16、非单通道或 shape 异常 PNG：{'、'.join(item['stem'] for item in unexpected) if unexpected else '未发现'}。",
+            f"- 最大值低于 300 或高于 20000 的 PNG：{'、'.join(unexpected_max) if unexpected_max else '未发现'}。",
+            f"- Infrared 通道差异 Tukey 异常样本：{infrared['channel_difference_outlier_count']} 个。",
+            "",
+            "这些记录用于后续人工复核和鲁棒性实验，不构成自动删除、填充、转换或修复数据的依据。",
+            "",
+            "## 11. IR-only 后续实验假设",
+            "",
+            "E002 建议在固定 split 上分别验证：原始三通道 IR、灰度单通道 IR、灰度复制三通道、IR 独立归一化，以及 CLAHE 受控消融。三通道高度相似使单通道方案具有验证价值，但仍需与保留三通道的兼容基线直接比较。",
+            "",
+            "**实验假设：** 在低照度、Visible 对比度不足、阴影或强光干扰等场景中，IR 可能提供额外的轮廓和目标响应信息。该判断仅用于提出分场景实验，不代表灰度化、CLAHE 或 IR-only 一定提升 mAP。",
+            "",
+            "## 12. Depth-only 后续实验假设",
+            "",
+            "E003 对 PNG 建议比较 percentile normalization、log-depth、inverse-depth 与 Depth + valid mask。输入形式可分别验证单通道、复制三通道、附加 valid-mask 通道、归一化到 `[0,1]` 以及固定无效值处理。",
+            "",
+            "JPG Depth 应作为独立的 uint8 representation，采用独立 normalization，不按毫米解释。如果训练代码把 PNG uint16 和 JPG uint8 直接纳入同一套物理尺度归一化，会造成明确的数据表示不一致风险。",
+            "",
+            "**实验假设：** 在前后景外观相似、尺度变化、遮挡或视觉纹理不足的场景中，有效 Depth 可能提供几何和距离线索；大面积无效区域则可能削弱这一作用，因此必须同时验证 valid mask。上述方案均需通过 E003 实验评估，不能预先认定会提升 mAP。",
+            "",
+            "## 13. Fusion 实验前安全约束",
+            "",
+            "后续 E004～E006 的 resize、crop、flip、affine 和 perspective 等几何增强必须在 Visible、IR 和 Depth 上共享完全相同的参数。光度增强与数值归一化可以按模态独立设计，但不得破坏三模态的几何对应关系。",
+            "",
+            "融合实验应显式考虑 IR black-border mask、Depth valid mask、残余错位和模态专用归一化。IR/Depth 相对 Visible 的残余偏移只可用于数据质量分析、有效区域 mask、鲁棒融合设计、显式配准实验和模态不确定性处理；不得用于移动或修改 Visible bbox、重写 `labels_clean`、依据 IR/Depth 偏移重新生成标注或擅自修正官方 Visible 标注。",
+            "",
+            "## 14. E002～E006 建议实验顺序",
+            "",
+            "```text",
+            "E001 RGB baseline",
+            "→ E002 IR-only",
+            "→ E003 Depth-only",
+            "→ E004 RGB + IR",
+            "→ E005 RGB + Depth",
+            "→ E006 RGB + IR + Depth",
+            "```",
+            "",
+            "该顺序先建立单模态基线，再评估双模态与三模态增益，有利于区分额外信息来自哪一模态。成员 C 的报告只提供可验证假设和数据边界，不实现 Fusion。",
+            "",
+            "## 15. 当前不能下结论的事项",
+            "",
+            "当前数据分析不能证明：",
+            "",
+            "- JPG Depth 的物理深度映射；",
+            "- 三模态已达到逐像素严格配准；",
+            "- 低置信或不可靠样本具有精确可信的 dx/dy；",
+            "- 图像级平移等价于目标级局部视差；",
+            "- Near 或 Far 必然对应更大的配准误差；",
+            "- CLAHE、percentile、log、inverse 或 valid mask 一定提升 mAP；",
+            "- Fusion 一定优于 RGB baseline。",
+            "",
+            "## 16. 成员 C 最终结论",
+            "",
+            f"1. Infrared 三通道高度相似但并非完全相同，存在 {infrared['channel_difference_outlier_count']} 个值得人工复核的通道差异 Tukey 异常样本。",
+            f"2. PNG Depth 为单通道 uint16，范围 {fmt_number(png['all_pixels']['min'], 0)}～{fmt_number(png['all_pixels']['max'], 0)}；JPG Depth 为三通道 uint8，范围 {fmt_number(jpg['global_pixels']['min'], 0)}～{fmt_number(jpg['global_pixels']['max'], 0)}，二者的数据表示和物理解释不可混用。",
+            f"3. PNG Depth 全局 zero ratio 为 {fmt_percent(png['global_zero_ratio'], 4)}，零值应作为无效深度候选单独处理；JPG Depth 的物理映射仍无法确认。",
+            "4. 三模态尺寸和 stem 完全对应，但现有证据不支持逐像素严格配准；IR 黑边、Depth 无效区及残余偏移需要在后续管线中显式处理。",
+            "5. IR 在低照度或 Visible 对比度不足场景、Depth 在可能受益于几何与距离线索的场景中，具有提供额外信息的实验价值；这仍是待验证假设。",
+            "6. 后续正式实验必须沿用固定 split，通过 E002～E006 逐项验证模态专用预处理和融合方案，不得根据 IR/Depth 偏移修改 Visible GT。",
         ]
     )
-    border_rows = (
-        ("visible", basic["visible"]),
-        ("infrared", basic["infrared"]),
-        ("depth PNG", summary["depth"]["border_by_encoding"]["png_uint16_single"]),
-        ("depth JPG", summary["depth"]["border_by_encoding"]["jpg_uint8"]),
-    )
-    for name, item in border_rows:
-        lines.append(
-            f"| {name} | {fmt_percent(item['border_occurrence_ratio'])} | "
-            f"{compact_distribution(item['effective_fov_ratio'], percent=True)} | "
-            f"{compact_distribution(item['low_pixel_ratio'], percent=True)} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## 6. PNG Depth statistics",
-            "",
-            f"- Files: {summary['depth']['png_file_count']}; representation: single-channel uint16.",
-            f"- All pixels: min={fmt_number(png['all_pixels']['min'])}, max={fmt_number(png['all_pixels']['max'])}, mean={fmt_number(png['all_pixels']['mean'])}, median={fmt_number(png['all_pixels']['median'])}.",
-            f"- Nonzero pixels: count={png['nonzero_pixels']['count']}, mean={fmt_number(png['nonzero_pixels']['mean'])}, median={fmt_number(png['nonzero_pixels']['median'])}.",
-            f"- Global zero ratio: {fmt_percent(png['global_zero_ratio'])}.",
-            f"- Per-image zero ratio: {compact_distribution(png['per_image_zero_ratio'], percent=True)}.",
-            f"- All-pixel `<300` ratio (includes zero): {fmt_percent(png['all_pixel_range_ratios']['below_300_including_zero'])}.",
-            f"- All-pixel `300..20000` inclusive ratio: {fmt_percent(png['all_pixel_range_ratios']['range_300_to_20000_inclusive'])}.",
-            f"- All-pixel `>20000` ratio: {fmt_percent(png['all_pixel_range_ratios']['above_20000'])}.",
-            f"- Nonzero `<300` ratio: {fmt_percent(png['nonzero_below_300_ratio'])}.",
-            "",
-            "## 7. JPG Depth statistics",
-            "",
-            f"- Files: {summary['depth']['jpg_file_count']}; observed dtype/channel distributions are shown in the basic table.",
-            f"- Global pixel range/mean/std: {fmt_number(jpg['global_pixels']['min'])} / {fmt_number(jpg['global_pixels']['max'])} / {fmt_number(jpg['global_pixels']['mean'])} / {fmt_number(jpg['global_pixels']['std'])}.",
-            f"- Per-image zero ratio: {compact_distribution(jpg['per_image_zero_ratio'], percent=True)}.",
-            f"- Per-image dynamic range: {compact_distribution(jpg['per_image_dynamic_range'])}.",
-            f"- Grayscale entropy: {compact_distribution(jpg['per_image_grayscale_entropy_bits'])} bits.",
-            f"- B/G difference: {compact_distribution(jpg['channel_mean_absolute_difference']['B_G'])}.",
-            f"- B/R difference: {compact_distribution(jpg['channel_mean_absolute_difference']['B_R'])}.",
-            f"- G/R difference: {compact_distribution(jpg['channel_mean_absolute_difference']['G_R'])}.",
-            "- JPG Depth physical mapping cannot be confirmed directly from the current data.",
-            "",
-            "## 8. PNG/JPG encoding differences",
-            "",
-            "PNG Depth and JPG Depth are separate representations. PNG files are evaluated as uint16 single-channel depth under the project specification. JPG files are compressed uint8 imagery with unknown physical mapping; their values are not merged with PNG statistics and are never subjected to millimeter thresholds.",
-            "",
-            "## 9. Spatial alignment analysis",
-            "",
-            "Pilot comparison found ORB-RANSAC unstable across modalities (implausible scale/rotation/translation) and global phase correlation reliable only for some JPG Visible/IR samples. The selected method is constrained local edge correlation. It searches only a small translation window and rejects weak, ambiguous, or boundary peaks.",
-            "",
-            "`dx,dy` describe detected modality-content translation relative to Visible in original-image pixels. Reliable flags are mandatory; unreliable estimates are excluded from displacement summaries.",
-            "Residual Infrared/Depth offsets may be used only for data-quality analysis, valid-region masks, robust Fusion design, explicit future registration experiments and modality-uncertainty handling. They must never be used to shift or modify Visible GT bboxes, rewrite `labels_clean`, regenerate annotations from IR/Depth offsets, or alter official Visible labels. The official Visible image remains the coordinate basis for every Visible GT bbox.",
-            "",
-        ]
-    )
-    lines.extend(registration_markdown("Visible ↔ Infrared", registration["visible_ir"]))
-    lines.extend(registration_markdown("Visible ↔ Depth", registration["visible_depth"]))
-    lines.extend(
-        [
-            "## 10. Near/far and bbox-scale alignment",
-            "",
-            f"- Targets with usable PNG physical-depth medians: {targets['physical_target_depth']['count']} ({fmt_percent(targets['physical_depth_coverage'])} of all labels).",
-            f"- Physical target-depth distribution: {compact_distribution(targets['physical_target_depth'])}.",
-            f"- Bbox area-ratio distribution: {compact_distribution(targets['bbox_area_ratio'])}.",
-            "- Near/far thresholds are the 33.3% and 66.7% quantiles of valid PNG target-depth medians. JPG targets are excluded from physical near/far grouping.",
-            "- Small/large bbox groups use bbox area-ratio quantiles and represent apparent target scale, not physical distance.",
-            f"- Limitation: {targets['method_note']}",
-            "",
-        ]
-    )
-    if targets.get("physical_depth_thresholds"):
-        thresholds = targets["physical_depth_thresholds"]
-        lines.append(
-            f"Physical thresholds: near <= {fmt_number(thresholds['near_max'])}, far >= {fmt_number(thresholds['far_min'])}."
-        )
-        lines.append("")
-    for section_name, key in (("Physical depth groups", "physical_depth_groups"), ("BBox scale groups", "bbox_scale_groups")):
-        groups = targets.get(key)
-        if not groups:
-            continue
-        lines.extend([f"### {section_name}", "", "| Group | Targets | Visible↔IR magnitude | Visible↔Depth magnitude |", "|---|---:|---|---|"])
-        for group_name, item in groups.items():
-            lines.append(
-                f"| {group_name} | {item['target_count']} | {compact_distribution_with_count(item['reg_ir'])} px | {compact_distribution_with_count(item['reg_depth'])} px |"
-            )
-        lines.append("")
-    lines.extend(
-        [
-            "## 11. Representative anomalies",
-            "",
-            f"- IR largest channel differences: {', '.join(item['stem'] for item in infrared['largest_channel_difference_stems']) or 'none'}.",
-            f"- PNG Depth highest zero ratios: {', '.join(item['stem'] for item in png['highest_zero_ratio_stems']) or 'none'}.",
-            f"- Lowest IR effective FOV: {', '.join(item['stem'] for item in basic['infrared']['lowest_fov_stems']) or 'none'}.",
-            f"- Lowest PNG Depth effective FOV: {', '.join(item['stem'] for item in summary['depth']['border_by_encoding']['png_uint16_single']['lowest_fov_stems']) or 'none'}.",
-            f"- Lowest JPG Depth visual FOV: {', '.join(item['stem'] for item in summary['depth']['border_by_encoding']['jpg_uint8']['lowest_fov_stems']) or 'none'}.",
-            "",
-            "## 12. IR-only preprocessing suggestions",
-            "",
-            "- Treat grayscale conversion or single-channel training as an ablation only if channel-difference statistics confirm strong redundancy; retaining the stored three channels is the compatibility baseline.",
-            "- Normalize IR independently from RGB. Consider CLAHE or contrast enhancement only as controlled experiments.",
-            "- Preserve or explicitly mask measured edge bands; do not crop them independently from other modalities in fusion training.",
-            "",
-            "## 13. Depth-only preprocessing suggestions",
-            "",
-            "- PNG: preserve uint16 on read, maintain a valid mask, and compare percentile, log-depth, or inverse-depth display/input transforms without modifying source files.",
-            "- PNG zero regions should remain distinguishable; an additional mask channel is an experiment candidate.",
-            "- JPG: treat as an independent uint8 encoded representation with its own normalization. Do not interpret values as millimeters.",
-            "- A training pipeline that silently mixes PNG uint16 and JPG uint8 Depth under one normalization is an engineering risk.",
-            "",
-            "## 14. C4 Depth visualization and anomaly review",
-            "",
-            "- The C4 figure layout is 2x3: Visible reference, normalized raw Depth, valid mask, P2-P98 percentile Depth, valid-only log1p Depth, and valid-only inverse Depth.",
-            "- All four physical-depth-derived views apply only to single-channel uint16 PNG Depth. Invalid zero pixels remain explicitly masked and are never treated as valid near-distance measurements.",
-            f"- Generated representative outputs: {visualization_outputs}.",
-            f"- Requested representative stems unavailable in the selected split: {missing_preferred}.",
-            f"- Near-all-zero PNG samples (zero ratio >= {fmt_percent(c4_anomalies.get('near_all_zero_threshold'))}): {near_all_zero}.",
-            f"- Completely black PNG samples: {all_black}.",
-            f"- Five smallest observed PNG dynamic ranges (stem, max-min): {lowest_dynamic}.",
-            f"- PNG samples with maximum below 300 or above 20000: {unexpected_max}.",
-            f"- PNG representation check: {c4_anomalies.get('png_count', 0)} files; dtypes {markdown_counter(c4_anomalies.get('png_dtypes', {}))}; channels {markdown_counter(c4_anomalies.get('png_channels', {}))}; shapes {markdown_counter(c4_anomalies.get('png_shapes', {}))}.",
-            f"- JPG representation check: {c4_anomalies.get('jpg_count', 0)} files; dtypes {markdown_counter(c4_anomalies.get('jpg_dtypes', {}))}; channels {markdown_counter(c4_anomalies.get('jpg_channels', {}))}; shapes {markdown_counter(c4_anomalies.get('jpg_shapes', {}))}; physical units remain unknown.",
-            f"- Unexpected PNG/JPG Depth representations: {unexpected_representations}.",
-            "- The valid mask directly exposes missing-depth regions. Percentile clipping improves display contrast while preserving the invalid mask; log-depth compresses long-range variation; inverse depth emphasizes near-range variation. These are candidate representations for controlled experiments, not replacements for the source Depth.",
-            "- For E003 Depth-only ablation, validate percentile normalization, log-depth, inverse-depth, and Depth plus valid-mask inputs. Compare single-channel input, three-channel replication, an extra valid-mask channel, [0,1] normalization, and a fixed invalid value. No option is claimed to improve mAP without experiment evidence.",
-            "- JPG Depth requires separate uint8 normalization and must not share PNG millimeter-scale transforms or thresholds.",
-            "",
-            "## 15. Fusion preprocessing suggestions",
-            "",
-            "- Resize, crop, flip, affine and perspective parameters must be shared exactly across Visible, IR and Depth.",
-            "- Modality-specific photometric normalization may differ, but geometry must stay synchronized.",
-            "- Carry IR edge-band masks and PNG invalid-depth masks where useful, and evaluate robustness to residual misalignment.",
-            "",
-            "## 16. Current limitations and unsupported conclusions",
-            "",
-            "- Automatic registration is a translation-only estimate on a deterministic sample, not a dense calibration or proof of pixel-perfect alignment.",
-            "- Unreliable matches are not converted into precise offsets.",
-            "- Target-group registration inherits image-level shifts and cannot establish target-local parallax.",
-            "- JPG Depth physical units and mapping remain unknown.",
-            "- These statistics motivate experiments; they do not establish that any preprocessing choice improves mAP.",
-            "",
-        ]
-    )
-    if summary["warnings"]:
-        lines.extend(["## Warnings", ""] + [f"- {message}" for message in summary["warnings"]] + [""])
-    if summary["errors"]:
-        lines.extend(["## Errors", ""] + [f"- {message}" for message in summary["errors"]] + [""])
-    return "\n".join(lines)
+    return "\n".join(lines) + "\n"
 
 
 def parse_args() -> argparse.Namespace:
