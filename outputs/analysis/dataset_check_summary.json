@@ -1,0 +1,85 @@
+{
+  "train_root": "D:\\AIC\\AIC2026-Multimodal-Detection\\data\\raw\\train",
+  "file_counts": {
+    "visible": 2000,
+    "infrared": 2000,
+    "depth": 2000,
+    "labels": 2000
+  },
+  "unique_stem_counts": {
+    "visible": 2000,
+    "infrared": 2000,
+    "depth": 2000,
+    "labels": 2000
+  },
+  "union_stem_count": 2000,
+  "common_stem_count": 2000,
+  "size_mismatch_count": 0,
+  "extension_mismatch_count": 0,
+  "image_summaries": {
+    "visible": {
+      "decoded_files": 2000,
+      "dtype_counts": {
+        "uint8": 2000
+      },
+      "channel_counts": {
+        "3": 2000
+      },
+      "shape_counts": {
+        "1080x1920x3": 1851,
+        "360x640x3": 149
+      },
+      "extension_counts": {
+        ".jpg": 149,
+        ".png": 1851
+      }
+    },
+    "infrared": {
+      "decoded_files": 2000,
+      "dtype_counts": {
+        "uint8": 2000
+      },
+      "channel_counts": {
+        "3": 2000
+      },
+      "shape_counts": {
+        "1080x1920x3": 1851,
+        "360x640x3": 149
+      },
+      "extension_counts": {
+        ".jpg": 149,
+        ".png": 1851
+      }
+    },
+    "depth": {
+      "decoded_files": 2000,
+      "dtype_counts": {
+        "uint16": 1851,
+        "uint8": 149
+      },
+      "channel_counts": {
+        "1": 1851,
+        "3": 149
+      },
+      "shape_counts": {
+        "1080x1920": 1851,
+        "360x640x3": 149
+      },
+      "extension_counts": {
+        ".jpg": 149,
+        ".png": 1851
+      }
+    }
+  },
+  "depth_statistics": {
+    "pixel_count": 3941222400,
+    "min": 0.0,
+    "max": 19999.0,
+    "mean": 5745.876048660182,
+    "median_of_image_medians": 4787.0,
+    "zero_ratio": 0.2905888442123946
+  },
+  "issue_count": 0,
+  "issue_counts": {},
+  "passed": true
+}
