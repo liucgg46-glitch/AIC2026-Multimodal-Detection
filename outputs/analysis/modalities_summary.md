@@ -32,6 +32,7 @@ Old path `data/raw/train/labels/labels/` is not used.
 - Common Visible/Infrared/Depth/clean-label stems: 2000.
 - Three-modality width agreement: 100.00%.
 - Three-modality height agreement: 100.00%.
+- Safety conclusion: equal width and height establish dimension agreement only; they do not establish strict pixel-level RGB/Visible, Infrared and Depth registration. Residual offsets, black borders, effective-field-of-view differences and automatic-registration reliability show that size agreement does not imply direct pixel correspondence.
 
 ## 4. Infrared dtype, channels and distribution
 
@@ -86,6 +87,7 @@ PNG Depth and JPG Depth are separate representations. PNG files are evaluated as
 Pilot comparison found ORB-RANSAC unstable across modalities (implausible scale/rotation/translation) and global phase correlation reliable only for some JPG Visible/IR samples. The selected method is constrained local edge correlation. It searches only a small translation window and rejects weak, ambiguous, or boundary peaks.
 
 `dx,dy` describe detected modality-content translation relative to Visible in original-image pixels. Reliable flags are mandatory; unreliable estimates are excluded from displacement summaries.
+Residual Infrared/Depth offsets may be used only for data-quality analysis, valid-region masks, robust Fusion design, explicit future registration experiments and modality-uncertainty handling. They must never be used to shift or modify Visible GT bboxes, rewrite `labels_clean`, regenerate annotations from IR/Depth offsets, or alter official Visible labels. The official Visible image remains the coordinate basis for every Visible GT bbox.
 
 ### Visible ↔ Infrared
 

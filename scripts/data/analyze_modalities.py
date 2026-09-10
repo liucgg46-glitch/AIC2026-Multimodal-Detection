@@ -31,6 +31,17 @@ DEFAULT_CSV = REPO_ROOT / "outputs" / "analysis" / "modalities_stats.csv"
 DEFAULT_REPORT = REPO_ROOT / "outputs" / "analysis" / "modalities_summary.md"
 SPLIT_DIR = REPO_ROOT / "data" / "splits"
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg"}
+
+
+def portable_project_path(path: Path) -> str:
+    """Return repository paths in portable POSIX form for generated artifacts."""
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError:
+        return resolved.as_posix()
+
+
 CLASS_NAMES = (
     "person",
     "boat",
@@ -920,6 +931,7 @@ def generate_report(summary: dict[str, Any]) -> str:
             f"- Common Visible/Infrared/Depth/clean-label stems: {matching['common_stems']}.",
             f"- Three-modality width agreement: {fmt_percent(matching['width_agreement_ratio'])}.",
             f"- Three-modality height agreement: {fmt_percent(matching['height_agreement_ratio'])}.",
+            "- Safety conclusion: equal width and height establish dimension agreement only; they do not establish strict pixel-level RGB/Visible, Infrared and Depth registration. Residual offsets, black borders, effective-field-of-view differences and automatic-registration reliability show that size agreement does not imply direct pixel correspondence.",
             "",
             "## 4. Infrared dtype, channels and distribution",
             "",
@@ -986,6 +998,7 @@ def generate_report(summary: dict[str, Any]) -> str:
             "Pilot comparison found ORB-RANSAC unstable across modalities (implausible scale/rotation/translation) and global phase correlation reliable only for some JPG Visible/IR samples. The selected method is constrained local edge correlation. It searches only a small translation window and rejects weak, ambiguous, or boundary peaks.",
             "",
             "`dx,dy` describe detected modality-content translation relative to Visible in original-image pixels. Reliable flags are mandatory; unreliable estimates are excluded from displacement summaries.",
+            "Residual Infrared/Depth offsets may be used only for data-quality analysis, valid-region masks, robust Fusion design, explicit future registration experiments and modality-uncertainty handling. They must never be used to shift or modify Visible GT bboxes, rewrite `labels_clean`, regenerate annotations from IR/Depth offsets, or alter official Visible labels. The official Visible image remains the coordinate basis for every Visible GT bbox.",
             "",
         ]
     )
@@ -1330,7 +1343,7 @@ def main() -> None:
             "fixed_split_overlap": len(train_set & val_set),
             "registration_sample_count": len(registration_stems),
             "seed": args.seed,
-            "label_dir": str(args.label_dir),
+            "label_dir": portable_project_path(args.label_dir),
         },
         "matching": matching,
         "basic": basic_results,

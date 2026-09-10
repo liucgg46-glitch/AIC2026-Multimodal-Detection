@@ -8,7 +8,7 @@
     "fixed_split_overlap": 0,
     "registration_sample_count": 200,
     "seed": 42,
-    "label_dir": "D:\\Competition\\AIC2026-Multimodal-Detection\\data\\processed\\train\\labels_clean"
+    "label_dir": "data/processed/train/labels_clean"
   },
   "matching": {
     "file_counts": {
