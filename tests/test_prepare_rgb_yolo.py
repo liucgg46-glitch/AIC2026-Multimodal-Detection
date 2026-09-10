@@ -58,6 +58,41 @@ def test_builds_standard_view_for_mixed_extensions(tmp_path: Path) -> None:
     assert len(config["names"]) == 12
 
 
+def test_builds_view_from_raw_visible_and_independent_clean_labels(
+    tmp_path: Path,
+) -> None:
+    data_root = make_source(tmp_path, {"train_sample": ".jpg", "val_sample": ".png"})
+    label_dir = tmp_path / "processed" / "train" / "labels_clean"
+    label_dir.mkdir(parents=True)
+    clean_labels = {
+        "train_sample": "6 0.4 0.4 0.2 0.2\n",
+        "val_sample": "8 0.6 0.6 0.1 0.1\n",
+    }
+    for stem, content in clean_labels.items():
+        (label_dir / f"{stem}.txt").write_text(content, encoding="utf-8")
+
+    train_split = write_split(tmp_path / "train.txt", ["train_sample"])
+    val_split = write_split(tmp_path / "val.txt", ["val_sample"])
+    output = tmp_path / "processed" / "rgb_yolo"
+
+    MODULE.build_view(
+        data_root,
+        train_split,
+        val_split,
+        output,
+        label_dir=label_dir,
+    )
+
+    assert (output / "images" / "train" / "train_sample.jpg").read_bytes() == b"train_sample"
+    assert (output / "images" / "val" / "val_sample.png").read_bytes() == b"val_sample"
+    assert (output / "labels" / "train" / "train_sample.txt").read_text(
+        encoding="utf-8"
+    ) == clean_labels["train_sample"]
+    assert (output / "labels" / "val" / "val_sample.txt").read_text(
+        encoding="utf-8"
+    ) == clean_labels["val_sample"]
+
+
 def test_empty_split_stops_without_creating_output(tmp_path: Path) -> None:
     data_root = make_source(tmp_path, {"sample": ".jpg"})
     train_split = write_split(tmp_path / "train.txt", [])

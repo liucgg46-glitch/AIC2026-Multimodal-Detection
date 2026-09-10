@@ -80,7 +80,10 @@ def index_images(image_dir: Path) -> dict[str, Path]:
 
 
 def validate_sources(
-    data_root: Path, train_split: Path, val_split: Path
+    data_root: Path,
+    train_split: Path,
+    val_split: Path,
+    label_dir: Path | None = None,
 ) -> dict[str, list[tuple[str, Path, Path]]]:
     train_stems = read_stems(train_split)
     val_stems = read_stems(val_split)
@@ -89,7 +92,7 @@ def validate_sources(
         raise DatasetViewError(f"train/val split 存在重复 stem: {overlap[:5]}")
 
     images = index_images(data_root / "visible")
-    label_dir = data_root / "labels"
+    label_dir = data_root / "labels" if label_dir is None else label_dir
     if not label_dir.is_dir():
         raise DatasetViewError(f"标签目录不存在: {label_dir}")
 
@@ -126,11 +129,12 @@ def build_view(
     val_split: Path,
     output_root: Path,
     *,
+    label_dir: Path | None = None,
     link_mode: str = "auto",
     force: bool = False,
 ) -> Counter[str]:
     """Validate all inputs, then atomically publish the generated view."""
-    entries = validate_sources(data_root, train_split, val_split)
+    entries = validate_sources(data_root, train_split, val_split, label_dir)
     output_root.parent.mkdir(parents=True, exist_ok=True)
     if output_root.exists() and not force:
         raise DatasetViewError(f"输出目录已存在；如需重建请显式使用 --force: {output_root}")
@@ -168,6 +172,11 @@ def build_view(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-root", default="data/raw/train")
+    parser.add_argument(
+        "--label-dir",
+        default=None,
+        help="标签目录；默认使用 <data-root>/labels",
+    )
     parser.add_argument("--train-split", default="data/splits/train.txt")
     parser.add_argument("--val-split", default="data/splits/val.txt")
     parser.add_argument("--output-root", default="data/processed/rgb_yolo")
@@ -189,6 +198,7 @@ def main() -> int:
     args = parse_args()
     try:
         data_root = project_path(args.data_root)
+        label_dir = project_path(args.label_dir) if args.label_dir is not None else None
         train_split = project_path(args.train_split)
         val_split = project_path(args.val_split)
         output_root = project_path(args.output_root)
@@ -197,6 +207,7 @@ def main() -> int:
             train_split,
             val_split,
             output_root,
+            label_dir=label_dir,
             link_mode=args.link_mode,
             force=args.force,
         )
