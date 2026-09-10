@@ -1,0 +1,7 @@
+stem,line,class_id,class_name,issue_type,review_status,action,notes
+000003_026_00000001,1,0,person,bbox_out_of_bounds,FAIL_CLASS_MISMATCH,propose_class_6_after_second_review,"框完整覆盖货车却标为class 0 person；同图第2行class 0正确框住远处行人，第3行class 6框住右侧车辆，建议第二人确认后在派生标签中将类别改为car"
+000003_080_00000307,8,0,person,invalid_bbox_size,PASS,use_clean,"人物被上下边缘截断；高度1.00093，裁剪到图像范围后保留"
+000042,28,0,person,bbox_out_of_bounds,REVIEW,keep_pending,"右侧仅部分目标可见，约38.5%的框宽在画面外；需结合原始全图或相关序列复核"
+001989,7,3,seat,bbox_out_of_bounds,PASS,keep_official,"官方类别为seat而非person；框住左侧座椅，左边约越界8像素"
+003817,3,0,person,invalid_bbox_size,PASS_WITH_ALIGNMENT_WARNING,use_clean,"Visible框合理且高度约越界2像素；Infrared/Depth中的近距离人物与Visible存在明显横向视差"
+shuming_102_00000228,,,-,empty_label,PASS,keep_empty,"画面内未见赛事12类明确目标；保留0字节标签作为合法负样本"

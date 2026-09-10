@@ -1,0 +1,35 @@
+{
+  "audit_item_count": 66,
+  "individual_panel_count": 66,
+  "contact_sheet_count": 11,
+  "issue_type_counts": {
+    "bbox_out_of_bounds": 59,
+    "invalid_bbox_size": 2,
+    "invalid_center_coordinate": 3,
+    "duplicate_annotation": 1,
+    "empty_label": 1
+  },
+  "modalities": [
+    "visible",
+    "infrared",
+    "depth"
+  ],
+  "raw_box_color": "red",
+  "clean_box_color": "cyan",
+  "review_status": "pending_human_review",
+  "visualization_dir": "D:\\AIC\\AIC2026-Multimodal-Detection\\outputs\\visualization\\label_audit",
+  "contact_sheets": [
+    "outputs\\visualization\\label_audit\\contact_sheet_01.jpg",
+    "outputs\\visualization\\label_audit\\contact_sheet_02.jpg",
+    "outputs\\visualization\\label_audit\\contact_sheet_03.jpg",
+    "outputs\\visualization\\label_audit\\contact_sheet_04.jpg",
+    "outputs\\visualization\\label_audit\\contact_sheet_05.jpg",
+    "outputs\\visualization\\label_audit\\contact_sheet_06.jpg",
+    "outputs\\visualization\\label_audit\\contact_sheet_07.jpg",
+    "outputs\\visualization\\label_audit\\contact_sheet_08.jpg",
+    "outputs\\visualization\\label_audit\\contact_sheet_09.jpg",
+    "outputs\\visualization\\label_audit\\contact_sheet_10.jpg",
+    "outputs\\visualization\\label_audit\\contact_sheet_11.jpg"
+  ],
+  "raw_data_modified": false
+}
