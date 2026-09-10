@@ -24,9 +24,9 @@
     {
       "class_id": 0,
       "class_name": "person",
-      "object_count": 5548,
+      "object_count": 5551,
       "image_count": 1115,
-      "object_fraction": 0.36514413584309596,
+      "object_fraction": 0.3653415822035014,
       "image_fraction": 0.5575
     },
     {
@@ -56,9 +56,9 @@
     {
       "class_id": 4,
       "class_name": "sign",
-      "object_count": 788,
+      "object_count": 781,
       "image_count": 424,
-      "object_fraction": 0.05186257733315783,
+      "object_fraction": 0.0514018691588785,
       "image_fraction": 0.212
     },
     {
@@ -72,10 +72,10 @@
     {
       "class_id": 6,
       "class_name": "car",
-      "object_count": 1949,
-      "image_count": 459,
-      "object_fraction": 0.1282743188100566,
-      "image_fraction": 0.2295
+      "object_count": 1946,
+      "image_count": 458,
+      "object_fraction": 0.12807687244965119,
+      "image_fraction": 0.229
     },
     {
       "class_id": 7,
@@ -88,10 +88,10 @@
     {
       "class_id": 8,
       "class_name": "light",
-      "object_count": 1835,
-      "image_count": 542,
-      "object_fraction": 0.12077135711465052,
-      "image_fraction": 0.271
+      "object_count": 1842,
+      "image_count": 543,
+      "object_fraction": 0.12123206528892984,
+      "image_fraction": 0.2715
     },
     {
       "class_id": 9,
@@ -122,9 +122,9 @@
     "largest_class": {
       "class_id": 0,
       "class_name": "person",
-      "object_count": 5548,
+      "object_count": 5551,
       "image_count": 1115,
-      "object_fraction": 0.36514413584309596,
+      "object_fraction": 0.3653415822035014,
       "image_fraction": 0.5575
     },
     "smallest_nonzero_class": {
@@ -135,7 +135,7 @@
       "object_fraction": 0.0017770172436488087,
       "image_fraction": 0.0115
     },
-    "max_to_min_nonzero_ratio": 205.4814814814815
+    "max_to_min_nonzero_ratio": 205.59259259259258
   },
   "bbox_statistics": {
     "width_px": {
@@ -254,15 +254,15 @@
       {
         "class_id": 0,
         "class_name": "person",
-        "object_count": 5548,
+        "object_count": 5551,
         "tiny_count": 1915,
-        "tiny_fraction": 0.3451694304253785,
+        "tiny_fraction": 0.3449828859664925,
         "small_count": 1618,
-        "small_fraction": 0.2916366258111031,
-        "medium_count": 1534,
-        "medium_fraction": 0.2764960346070656,
+        "small_fraction": 0.2914790127904882,
+        "medium_count": 1537,
+        "medium_fraction": 0.27688704737885067,
         "large_count": 481,
-        "large_fraction": 0.08669790915645277
+        "large_fraction": 0.08665105386416862
       },
       {
         "class_id": 1,
@@ -306,15 +306,15 @@
       {
         "class_id": 4,
         "class_name": "sign",
-        "object_count": 788,
-        "tiny_count": 260,
-        "tiny_fraction": 0.3299492385786802,
-        "small_count": 270,
-        "small_fraction": 0.3426395939086294,
-        "medium_count": 216,
-        "medium_fraction": 0.27411167512690354,
+        "object_count": 781,
+        "tiny_count": 258,
+        "tiny_fraction": 0.33034571062740076,
+        "small_count": 267,
+        "small_fraction": 0.3418693982074264,
+        "medium_count": 214,
+        "medium_fraction": 0.2740076824583867,
         "large_count": 42,
-        "large_fraction": 0.0532994923857868
+        "large_fraction": 0.05377720870678617
       },
       {
         "class_id": 5,
@@ -332,15 +332,15 @@
       {
         "class_id": 6,
         "class_name": "car",
-        "object_count": 1949,
+        "object_count": 1946,
         "tiny_count": 366,
-        "tiny_fraction": 0.18778860954335558,
+        "tiny_fraction": 0.1880781089414183,
         "small_count": 1082,
-        "small_fraction": 0.5551564905079528,
-        "medium_count": 422,
-        "medium_fraction": 0.21652129297075423,
+        "small_fraction": 0.5560123329907503,
+        "medium_count": 419,
+        "medium_fraction": 0.21531346351490235,
         "large_count": 79,
-        "large_fraction": 0.040533606977937404
+        "large_fraction": 0.040596094552929084
       },
       {
         "class_id": 7,
@@ -358,15 +358,15 @@
       {
         "class_id": 8,
         "class_name": "light",
-        "object_count": 1835,
-        "tiny_count": 211,
-        "tiny_fraction": 0.11498637602179837,
-        "small_count": 609,
-        "small_fraction": 0.33188010899182563,
-        "medium_count": 949,
-        "medium_fraction": 0.5171662125340599,
+        "object_count": 1842,
+        "tiny_count": 213,
+        "tiny_fraction": 0.11563517915309446,
+        "small_count": 612,
+        "small_fraction": 0.3322475570032573,
+        "medium_count": 951,
+        "medium_fraction": 0.5162866449511401,
         "large_count": 66,
-        "large_fraction": 0.03596730245231607
+        "large_fraction": 0.035830618892508145
       },
       {
         "class_id": 9,

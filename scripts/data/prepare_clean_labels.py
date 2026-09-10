@@ -1,10 +1,11 @@
 """Create a minimally corrected AIC2026 label copy without editing data/raw.
 
-Only the six reviewed rows listed in ``FIXES`` are changed: five invalid YOLO
-boxes are clipped to the image boundary and one exact duplicate is omitted.
-All other rows, including valid boxes whose corners extend outside the image,
-are copied verbatim. The script is deterministic and verifies that source-file
-hashes do not change while it runs.
+Only explicitly reviewed rows are changed: five invalid YOLO boxes are clipped
+to the image boundary, one exact duplicate is omitted, and five visually
+confirmed class mismatches are reclassified. All other rows, including valid
+boxes whose corners extend outside the image, are copied verbatim. The script
+is deterministic and verifies that source-file hashes do not change while it
+runs.
 """
 
 from __future__ import annotations
@@ -29,6 +30,20 @@ CLIP_LINES = {
     ("003817", 3),
 }
 DROP_DUPLICATE_LINES = {("hehe_10_00000044", 14)}
+RECLASS_LINES = {
+    ("000003_026_00000001", 1): 6,  # truck: person -> car
+    ("000005_026_00000001", 1): 0,  # four people: car -> person
+    ("000005_026_00000001", 2): 0,
+    ("000005_026_00000001", 3): 0,
+    ("000005_026_00000001", 4): 0,
+    ("002517", 1): 8,  # seven street lights: sign -> light
+    ("002517", 2): 8,
+    ("002517", 3): 8,
+    ("002517", 4): 8,
+    ("002517", 5): 8,
+    ("002517", 6): 8,
+    ("002517", 7): 8,
+}
 
 
 def sha256(path: Path) -> str:
@@ -70,6 +85,16 @@ def clip_yolo_row(text: str) -> tuple[str, dict[str, float]]:
     }
 
 
+def reclassify_yolo_row(text: str, new_class_id: int) -> str:
+    fields = text.split()
+    if len(fields) != 5:
+        raise ValueError(f"Expected 5 fields in reviewed row, got: {text!r}")
+    old_class_id = int(fields[0])
+    if old_class_id == new_class_id:
+        raise ValueError(f"Reviewed row already has class {new_class_id}: {text!r}")
+    return " ".join([str(new_class_id), *fields[1:]])
+
+
 def main() -> None:
     source_paths = sorted(SOURCE_DIR.glob("*.txt"), key=lambda p: p.name.casefold())
     if len(source_paths) != 2000:
@@ -86,6 +111,7 @@ def main() -> None:
     changes: list[dict[str, object]] = []
     applied_clip_lines: set[tuple[str, int]] = set()
     applied_drop_lines: set[tuple[str, int]] = set()
+    applied_reclass_lines: set[tuple[str, int]] = set()
 
     for source_path in source_paths:
         source_text = source_path.read_text(encoding="utf-8-sig")
@@ -118,6 +144,19 @@ def main() -> None:
                     }
                 )
                 output_lines.append(clipped)
+            elif key in RECLASS_LINES:
+                reclassified = reclassify_yolo_row(line, RECLASS_LINES[key])
+                applied_reclass_lines.add(key)
+                changes.append(
+                    {
+                        "stem": source_path.stem,
+                        "line": line_number,
+                        "action": "reclassify_visually_confirmed_box",
+                        "before": line,
+                        "after": reclassified,
+                    }
+                )
+                output_lines.append(reclassified)
             else:
                 output_lines.append(line)
 
@@ -130,6 +169,8 @@ def main() -> None:
         raise RuntimeError(f"Missing clip rows: {sorted(CLIP_LINES - applied_clip_lines)}")
     if applied_drop_lines != DROP_DUPLICATE_LINES:
         raise RuntimeError(f"Missing duplicate rows: {sorted(DROP_DUPLICATE_LINES - applied_drop_lines)}")
+    if applied_reclass_lines != set(RECLASS_LINES):
+        raise RuntimeError(f"Missing reclass rows: {sorted(set(RECLASS_LINES) - applied_reclass_lines)}")
 
     after_hashes = {path.name: sha256(path) for path in source_paths}
     if before_hashes != after_hashes:
@@ -153,6 +194,7 @@ def main() -> None:
         "output_label_files": len(output_paths),
         "clipped_invalid_boxes": len(applied_clip_lines),
         "removed_exact_duplicates": len(applied_drop_lines),
+        "reclassified_boxes": len(applied_reclass_lines),
         "source_files_unchanged": True,
         "empty_label_preserved": (OUTPUT_DIR / "shuming_102_00000228.txt").read_text(
             encoding="utf-8-sig"

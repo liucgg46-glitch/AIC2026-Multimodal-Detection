@@ -5,6 +5,7 @@
   "output_label_files": 2000,
   "clipped_invalid_boxes": 5,
   "removed_exact_duplicates": 1,
+  "reclassified_boxes": 12,
   "source_files_unchanged": true,
   "empty_label_preserved": true,
   "unreviewed_rows_changed": 0

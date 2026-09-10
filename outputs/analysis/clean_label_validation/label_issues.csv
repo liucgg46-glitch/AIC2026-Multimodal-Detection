@@ -1,5 +1,5 @@
 ﻿stem,file,line,severity,issue_type,details,content
-000003_026_00000001,D:\AIC\AIC2026-Multimodal-Detection\data\processed\train\labels_clean\000003_026_00000001.txt,1,warning,bbox_out_of_bounds,"edges=(0.247396, -0.002778, 1, 0.675926)",0 0.623698 0.336574 0.752604 0.678704
+000003_026_00000001,D:\AIC\AIC2026-Multimodal-Detection\data\processed\train\labels_clean\000003_026_00000001.txt,1,warning,bbox_out_of_bounds,"edges=(0.247396, -0.002778, 1, 0.675926)",6 0.623698 0.336574 0.752604 0.678704
 000005_014_00000292,D:\AIC\AIC2026-Multimodal-Detection\data\processed\train\labels_clean\000005_014_00000292.txt,5,warning,bbox_out_of_bounds,"edges=(0.502604, -0.0018525, 0.641666, 0.4398145)",0 0.572135 0.218981 0.139062 0.441667
 000008_012_00000001,D:\AIC\AIC2026-Multimodal-Detection\data\processed\train\labels_clean\000008_012_00000001.txt,4,warning,bbox_out_of_bounds,"edges=(0.3322915, 0.4009265, 0.4906245, 1.0074075)",0 0.411458 0.704167 0.158333 0.606481
 000011_008_00000001,D:\AIC\AIC2026-Multimodal-Detection\data\processed\train\labels_clean\000011_008_00000001.txt,1,warning,bbox_out_of_bounds,"edges=(0.4182295, 0.5824075, 0.6411465, 1.0425925)",0 0.529688 0.8125 0.222917 0.460185
