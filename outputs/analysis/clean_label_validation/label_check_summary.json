@@ -1,0 +1,418 @@
+{
+  "label_dir": "D:\\AIC\\AIC2026-Multimodal-Detection\\data\\processed\\train\\labels_clean",
+  "label_file_count": 2000,
+  "empty_label_file_count": 1,
+  "empty_label_stems": [
+    "shuming_102_00000228"
+  ],
+  "total_nonempty_rows": 15194,
+  "valid_object_count": 15194,
+  "invalid_row_count": 0,
+  "issue_count": 59,
+  "error_count": 0,
+  "warning_count": 59,
+  "issue_counts": {
+    "bbox_out_of_bounds": 59
+  },
+  "objects_per_image": {
+    "min": 0,
+    "max": 66,
+    "mean": 7.597,
+    "median": 5.0
+  },
+  "class_counts": [
+    {
+      "class_id": 0,
+      "class_name": "person",
+      "object_count": 5548,
+      "image_count": 1115,
+      "object_fraction": 0.36514413584309596,
+      "image_fraction": 0.5575
+    },
+    {
+      "class_id": 1,
+      "class_name": "boat",
+      "object_count": 135,
+      "image_count": 62,
+      "object_fraction": 0.008885086218244043,
+      "image_fraction": 0.031
+    },
+    {
+      "class_id": 2,
+      "class_name": "animal",
+      "object_count": 3020,
+      "image_count": 798,
+      "object_fraction": 0.19876266947479268,
+      "image_fraction": 0.399
+    },
+    {
+      "class_id": 3,
+      "class_name": "seat",
+      "object_count": 641,
+      "image_count": 322,
+      "object_fraction": 0.04218770567329209,
+      "image_fraction": 0.161
+    },
+    {
+      "class_id": 4,
+      "class_name": "sign",
+      "object_count": 788,
+      "image_count": 424,
+      "object_fraction": 0.05186257733315783,
+      "image_fraction": 0.212
+    },
+    {
+      "class_id": 5,
+      "class_name": "bicycle",
+      "object_count": 666,
+      "image_count": 214,
+      "object_fraction": 0.043833092010003946,
+      "image_fraction": 0.107
+    },
+    {
+      "class_id": 6,
+      "class_name": "car",
+      "object_count": 1949,
+      "image_count": 459,
+      "object_fraction": 0.1282743188100566,
+      "image_fraction": 0.2295
+    },
+    {
+      "class_id": 7,
+      "class_name": "ball",
+      "object_count": 95,
+      "image_count": 78,
+      "object_fraction": 0.006252468079505068,
+      "image_fraction": 0.039
+    },
+    {
+      "class_id": 8,
+      "class_name": "light",
+      "object_count": 1835,
+      "image_count": 542,
+      "object_fraction": 0.12077135711465052,
+      "image_fraction": 0.271
+    },
+    {
+      "class_id": 9,
+      "class_name": "garbage can",
+      "object_count": 282,
+      "image_count": 231,
+      "object_fraction": 0.01855995787810978,
+      "image_fraction": 0.1155
+    },
+    {
+      "class_id": 10,
+      "class_name": "uav",
+      "object_count": 208,
+      "image_count": 150,
+      "object_fraction": 0.013689614321442676,
+      "image_fraction": 0.075
+    },
+    {
+      "class_id": 11,
+      "class_name": "tricycle",
+      "object_count": 27,
+      "image_count": 23,
+      "object_fraction": 0.0017770172436488087,
+      "image_fraction": 0.0115
+    }
+  ],
+  "class_imbalance": {
+    "largest_class": {
+      "class_id": 0,
+      "class_name": "person",
+      "object_count": 5548,
+      "image_count": 1115,
+      "object_fraction": 0.36514413584309596,
+      "image_fraction": 0.5575
+    },
+    "smallest_nonzero_class": {
+      "class_id": 11,
+      "class_name": "tricycle",
+      "object_count": 27,
+      "image_count": 23,
+      "object_fraction": 0.0017770172436488087,
+      "image_fraction": 0.0115
+    },
+    "max_to_min_nonzero_ratio": 205.4814814814815
+  },
+  "bbox_statistics": {
+    "width_px": {
+      "count": 15194,
+      "min": 8.0000064,
+      "p01": 12.9999936,
+      "p05": 18.0,
+      "p25": 37.60848,
+      "median": 69.0,
+      "mean": 110.71690231407135,
+      "p75": 141.0,
+      "p95": 333.99936,
+      "p99": 585.9993599999999,
+      "max": 1814.00064
+    },
+    "height_px": {
+      "count": 15194,
+      "min": 6.999998400000001,
+      "p01": 14.000003999999999,
+      "p05": 23.000004,
+      "p25": 46.000008,
+      "median": 76.833522,
+      "mean": 138.67299539905224,
+      "p75": 165.77433,
+      "p95": 445.52759399999894,
+      "p99": 931.4199935999983,
+      "max": 1080.0
+    },
+    "area_px": {
+      "count": 15194,
+      "min": 99.99994399999488,
+      "p01": 240.00049775928036,
+      "p05": 527.0001303999744,
+      "p25": 2091.00204,
+      "median": 5550.003522,
+      "mean": 28450.082609091332,
+      "p75": 17639.98236,
+      "p95": 127513.53851207039,
+      "p99": 407011.9899088318,
+      "max": 1912680.3456000001
+    },
+    "relative_area": {
+      "count": 15194,
+      "min": 4.8225281635799995e-05,
+      "p01": 0.00013888875,
+      "p05": 0.00030140678048,
+      "p25": 0.0011178649035499999,
+      "median": 0.0028766413869599997,
+      "mean": 0.013861155613214354,
+      "p75": 0.0087066129861,
+      "p95": 0.06149379750775,
+      "p99": 0.19628278834337953,
+      "max": 0.922396
+    },
+    "aspect_ratio_w_over_h": {
+      "count": 15194,
+      "min": 0.08418366487921788,
+      "p01": 0.19745885683219788,
+      "p05": 0.2916666666666667,
+      "p25": 0.4594590860486544,
+      "median": 0.7749991749991749,
+      "mean": 1.106812885565127,
+      "p75": 1.3928578641595082,
+      "p95": 3.176685214006745,
+      "p99": 4.75000675000675,
+      "max": 17.799992176000625
+    },
+    "reference_area_px2": {
+      "count": 15194,
+      "min": 11.11110488888832,
+      "p01": 31.999968,
+      "p05": 69.444122222592,
+      "p25": 257.55607377791995,
+      "median": 662.778175555584,
+      "mean": 3193.6102532845875,
+      "p75": 2006.0036319974397,
+      "p95": 14168.170945785598,
+      "p99": 45223.55443431465,
+      "max": 212520.0384
+    }
+  },
+  "size_categories": {
+    "status": "team_standard_defined",
+    "official_competition_standard": false,
+    "reference_imgsz": 640,
+    "scaling": "scale=min(reference_imgsz/W, reference_imgsz/H)",
+    "thresholds_px2": {
+      "tiny": "area < 256",
+      "small": "256 <= area < 1024",
+      "medium": "1024 <= area < 9216",
+      "large": "area >= 9216"
+    },
+    "distribution": [
+      {
+        "size_category": "tiny",
+        "bbox_count": 3778,
+        "bbox_fraction": 0.24865078320389628
+      },
+      {
+        "size_category": "small",
+        "bbox_count": 5327,
+        "bbox_fraction": 0.3505989206265631
+      },
+      {
+        "size_category": "medium",
+        "bbox_count": 4899,
+        "bbox_fraction": 0.32242990654205606
+      },
+      {
+        "size_category": "large",
+        "bbox_count": 1190,
+        "bbox_fraction": 0.07832038962748453
+      }
+    ],
+    "per_class_distribution": [
+      {
+        "class_id": 0,
+        "class_name": "person",
+        "object_count": 5548,
+        "tiny_count": 1915,
+        "tiny_fraction": 0.3451694304253785,
+        "small_count": 1618,
+        "small_fraction": 0.2916366258111031,
+        "medium_count": 1534,
+        "medium_fraction": 0.2764960346070656,
+        "large_count": 481,
+        "large_fraction": 0.08669790915645277
+      },
+      {
+        "class_id": 1,
+        "class_name": "boat",
+        "object_count": 135,
+        "tiny_count": 30,
+        "tiny_fraction": 0.2222222222222222,
+        "small_count": 35,
+        "small_fraction": 0.25925925925925924,
+        "medium_count": 47,
+        "medium_fraction": 0.34814814814814815,
+        "large_count": 23,
+        "large_fraction": 0.17037037037037037
+      },
+      {
+        "class_id": 2,
+        "class_name": "animal",
+        "object_count": 3020,
+        "tiny_count": 498,
+        "tiny_fraction": 0.16490066225165562,
+        "small_count": 1186,
+        "small_fraction": 0.3927152317880795,
+        "medium_count": 1091,
+        "medium_fraction": 0.3612582781456954,
+        "large_count": 245,
+        "large_fraction": 0.08112582781456953
+      },
+      {
+        "class_id": 3,
+        "class_name": "seat",
+        "object_count": 641,
+        "tiny_count": 29,
+        "tiny_fraction": 0.0452418096723869,
+        "small_count": 131,
+        "small_fraction": 0.20436817472698907,
+        "medium_count": 299,
+        "medium_fraction": 0.4664586583463339,
+        "large_count": 182,
+        "large_fraction": 0.2839313572542902
+      },
+      {
+        "class_id": 4,
+        "class_name": "sign",
+        "object_count": 788,
+        "tiny_count": 260,
+        "tiny_fraction": 0.3299492385786802,
+        "small_count": 270,
+        "small_fraction": 0.3426395939086294,
+        "medium_count": 216,
+        "medium_fraction": 0.27411167512690354,
+        "large_count": 42,
+        "large_fraction": 0.0532994923857868
+      },
+      {
+        "class_id": 5,
+        "class_name": "bicycle",
+        "object_count": 666,
+        "tiny_count": 294,
+        "tiny_fraction": 0.44144144144144143,
+        "small_count": 176,
+        "small_fraction": 0.26426426426426425,
+        "medium_count": 153,
+        "medium_fraction": 0.22972972972972974,
+        "large_count": 43,
+        "large_fraction": 0.06456456456456457
+      },
+      {
+        "class_id": 6,
+        "class_name": "car",
+        "object_count": 1949,
+        "tiny_count": 366,
+        "tiny_fraction": 0.18778860954335558,
+        "small_count": 1082,
+        "small_fraction": 0.5551564905079528,
+        "medium_count": 422,
+        "medium_fraction": 0.21652129297075423,
+        "large_count": 79,
+        "large_fraction": 0.040533606977937404
+      },
+      {
+        "class_id": 7,
+        "class_name": "ball",
+        "object_count": 95,
+        "tiny_count": 62,
+        "tiny_fraction": 0.6526315789473685,
+        "small_count": 24,
+        "small_fraction": 0.25263157894736843,
+        "medium_count": 9,
+        "medium_fraction": 0.09473684210526316,
+        "large_count": 0,
+        "large_fraction": 0.0
+      },
+      {
+        "class_id": 8,
+        "class_name": "light",
+        "object_count": 1835,
+        "tiny_count": 211,
+        "tiny_fraction": 0.11498637602179837,
+        "small_count": 609,
+        "small_fraction": 0.33188010899182563,
+        "medium_count": 949,
+        "medium_fraction": 0.5171662125340599,
+        "large_count": 66,
+        "large_fraction": 0.03596730245231607
+      },
+      {
+        "class_id": 9,
+        "class_name": "garbage can",
+        "object_count": 282,
+        "tiny_count": 71,
+        "tiny_fraction": 0.25177304964539005,
+        "small_count": 85,
+        "small_fraction": 0.30141843971631205,
+        "medium_count": 108,
+        "medium_fraction": 0.3829787234042553,
+        "large_count": 18,
+        "large_fraction": 0.06382978723404255
+      },
+      {
+        "class_id": 10,
+        "class_name": "uav",
+        "object_count": 208,
+        "tiny_count": 41,
+        "tiny_fraction": 0.1971153846153846,
+        "small_count": 107,
+        "small_fraction": 0.5144230769230769,
+        "medium_count": 60,
+        "medium_fraction": 0.28846153846153844,
+        "large_count": 0,
+        "large_fraction": 0.0
+      },
+      {
+        "class_id": 11,
+        "class_name": "tricycle",
+        "object_count": 27,
+        "tiny_count": 1,
+        "tiny_fraction": 0.037037037037037035,
+        "small_count": 4,
+        "small_fraction": 0.14814814814814814,
+        "medium_count": 11,
+        "medium_fraction": 0.4074074074074074,
+        "large_count": 11,
+        "large_fraction": 0.4074074074074074
+      }
+    ]
+  },
+  "passed": true,
+  "notes": [
+    "Empty label files are counted but are not treated as invalid.",
+    "BBox edge checks use a 1e-6 tolerance for decimal rounding.",
+    "Out-of-bounds edges and exact duplicates are quality warnings; they do not invalidate rows that satisfy the official five-field value rules."
+  ]
+}

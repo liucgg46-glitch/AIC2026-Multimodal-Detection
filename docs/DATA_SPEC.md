@@ -133,6 +133,32 @@ class_id norm_center_x norm_center_y norm_w norm_h
 
 检查程序只报告问题，不直接修改官方原始数据。
 
+## 6.1 目标尺寸分档（团队内部分析标准）
+
+本节定义仅用于团队内部的数据统计、划分复核和实验分析，**不是赛事官方标准**。
+
+所有 bbox 固定映射到 `imgsz=640` 的参考 letterbox 尺度。即使后续某次训练使用其他 `imgsz`，统计口径也不改变，以保证不同实验之间可比较。
+
+对原图宽高 `W、H` 和归一化框宽高 `norm_w、norm_h`，计算：
+
+```text
+scale = min(640 / W, 640 / H)
+bbox_width_ref  = norm_w * W * scale
+bbox_height_ref = norm_h * H * scale
+bbox_area_ref   = bbox_width_ref * bbox_height_ref
+```
+
+按照 `bbox_area_ref`（单位：参考尺度像素平方）分档：
+
+```text
+tiny   : area < 256
+small  : 256 <= area < 1024
+medium : 1024 <= area < 9216
+large  : area >= 9216
+```
+
+其中 `small / medium / large` 的 32² 与 96² 边界借鉴 COCO 面积尺度，`tiny < 16²` 是本团队增加的分析档位。实现必须使用上述通用 letterbox 缩放公式，不得把当前数据的内容高度 `360` 写死。
+
 ## 7. 固定 train / val
 
 完成训练数据检查后建立固定划分：
@@ -157,6 +183,43 @@ data/splits/val.txt
 - 不复制、不移动原始图像；
 - 所有正式可比较实验使用同一 split；
 - 相同数据与 seed 应生成完全一致的划分。
+
+为减少连续帧或同场景样本跨越 train / val 造成的验证泄漏，本项目固定采用 seed=2026 的确定性 group-aware 多标签分层，而不是单张图片级随机划分。该方法属于团队内部数据划分规范，不是赛事官方标准。
+
+分组规则：
+
+- 带下划线且末段为数字帧号的 stem：删除最后帧号后，前缀相同的样本归入同一组；
+- 纯数字 stem：仅当相邻编号差不超过 5，且 64×36 灰度相关系数不低于 0.90 或 dHash 汉明距离不大于 5 时连接为同一候选序列组；
+- 同一个 group 不得跨越 train / val；
+- 分层同时考虑 12 类目标数、12 类图片覆盖数和四种目标尺寸数量；
+- 固定使用 5000 次候选搜索和 50000 次同组大小局部交换，seed 固定为 2026；
+- 最终必须检查 1600/400 数量、stem 全覆盖、零交集、group 零交叉、类别覆盖和尺寸覆盖，并记录 split 文件 SHA256。
+
+## 7.1 训练标签最小清洗副本
+
+官方原始标签始终保留在 `data/raw/train/labels/`，不得覆盖。训练如需使用已复核的最小修正版，统一生成到：
+
+```text
+data/processed/train/labels_clean/
+```
+
+当前团队内部处理口径：
+
+- 只修复 B2 已定位并目视复核的 5 个官方字段范围错误；
+- 将 YOLO 中心点和宽高还原为四角坐标，裁剪到 `[0, 1]` 后重新计算中心点和宽高；
+- 只删除 1 个完全相同的重复框；
+- 保留无目标场景的空标签文件；
+- 其余字段合法但边缘轻微越界的 warning 暂不批量改写；
+- 必须输出逐行改动清单，并复检至 `error_count=0`；
+- 该处理是团队内部训练预处理标准，不是赛事官方要求。
+
+生成命令：
+
+```powershell
+python scripts/data/prepare_clean_labels.py
+```
+
+`data/processed/` 已被 Git 忽略；各成员需使用相同脚本从各自的官方训练集本地生成，不能上传比赛数据。
 
 ## 8. 测试数据使用
 
