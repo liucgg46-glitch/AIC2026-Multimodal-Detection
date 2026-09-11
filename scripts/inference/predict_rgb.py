@@ -68,7 +68,7 @@ def prediction_lines(result: object, max_det: int) -> list[str]:
         if not all(0.0 <= value <= 1.0 for value in coordinates):
             raise InferenceError(f"预测归一化坐标越界: {coordinates} ({result.path})")
         if width <= 0.0 or height <= 0.0:
-            raise InferenceError(f"预测框宽高必须大于 0: {coordinates} ({result.path})")
+            continue
         if not 0.0 <= confidence <= 1.0:
             raise InferenceError(f"预测 confidence 越界: {confidence} ({result.path})")
         lines.append(
@@ -108,7 +108,8 @@ def run_inference(
     try:
         model = YOLO(model_source)
         results = model.predict(
-            source=[str(path) for path in images],
+            source=str(source),
+            batch=1,
             device=device,
             imgsz=imgsz,
             conf=conf,
