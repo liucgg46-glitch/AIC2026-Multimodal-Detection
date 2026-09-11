@@ -1,110 +1,113 @@
 # TASKS
 
-## 1. 当前状态
+## Phase 1：已完成
 
-- [x] Private Git 仓库已建立
-- [x] 项目规范已建立
-- [x] 正式训练数据已获得
-- [ ] 数据路径完成配置
-- [ ] 三人功能分支建立
-- [ ] 服务器训练环境确认
+第一阶段已完成并合入 `main`：
 
----
+- [x] Private Git 仓库与项目规范建立
+- [x] Official training data validation
+- [x] 标签合法性与类别、bbox 分布检查
+- [x] Fixed 1600/400 split，seed = 2026
+- [x] Clean labels 可复现生成与复检
+- [x] Multimodal inspection、Depth 专项分析与最终报告
+- [x] RGB training pipeline
+- [x] RGB inference pipeline
+- [x] Submission-format checker
+- [x] E001 RAW historical baseline
+- [x] E001 CLEAN canonical baseline
+- [x] Official preliminary-test inference
+- [x] First submission `S001`
+- [x] RGB inference stability hotfix
 
-## 2. 第一阶段并行任务
+第一阶段正式结果与历史记录见 `docs/EXPERIMENT_LOG.md`。三份第一阶段任务书继续保留：
 
-### 成员 A：模型与实验
+- `CODEX_A_RGB_BASELINE.md`
+- `CODEX_B_DATA_ANALYSIS.md`
+- `CODEX_C_MULTIMODAL_INSPECTION.md`
 
-- [ ] PyTorch / CUDA / Ultralytics 环境验证
-- [ ] RGB baseline 工程准备
-- [ ] 训练入口
-- [ ] 推理入口
-- [ ] 提交格式工具
-- [ ] `tests/test_submission_format.py`
-- [ ] E001 配置准备
-
-### 成员 B：数据分析
-
-- [ ] 训练数据完整性检查
-- [ ] 标签合法性检查
-- [ ] 12 类统计
-- [ ] bbox 分布统计
-- [ ] 固定 80/20 train / val
-- [ ] seed = 2026
-- [ ] 生成 `train.txt`
-- [ ] 生成 `val.txt`
-
-### 成员 C：三模态数据分析
-
-- [ ] RGB / IR / Depth 可视化
-- [ ] 三模态尺寸检查
-- [ ] Infrared 三通道差异统计
-- [ ] Depth dtype / range / invalid ratio
-- [ ] 人工检查代表性样本空间对应
-- [ ] 生成三模态分析报告
-
-三条任务并行执行。
+Leaderboard score：`PENDING`
 
 ---
 
-## 3. Phase 2 - 固定数据划分
+## Current Stage: Phase 2 - Single-Modality Understanding
 
-成员 B 完成数据检查后：
+第二阶段包含三条并行工作线。
 
-- [ ] 生成 `data/splits/train.txt`
-- [ ] 生成 `data/splits/val.txt`
-- [ ] 提交 `feature/data-analysis`
-- [ ] Pull Request 合并到 `main`
-- [ ] 全队确认 split 固定
+### 成员 A：E002 / E003 Formal Experiments
 
-该步骤是所有正式训练实验的共同前置条件。
+- [ ] 持续维护 `docs/EXPERIMENT_LOG.md`
+- [ ] 等待 C 的 IR interface 合入后执行 E002 IR-only
+- [ ] 等待 C 的 Depth interface 合入后执行 E003 Depth-only
+- [ ] 使用固定 1600/400 split、`labels_clean` 和 seed = 2026
+- [ ] 完成 RGB / IR / Depth 统一比较表
+- [ ] 给出 Phase 2 单模态结论与 Fusion 优先顺序
+
+详细边界见 `docs/CODEX_A_PHASE2_EXPERIMENTS.md`。
+
+### 成员 B：E001 CLEAN Error Analysis
+
+- [ ] 整理固定 val 上的 per-class metrics
+- [ ] 完成 confusion、FP、FN 分析
+- [ ] 沿用既定 tiny/small/medium/large size bin 分析性能
+- [ ] 整理代表性 hard cases
+- [ ] 分析数据属性与性能的 correlation / hypothesis
+- [ ] 提炼 E002/E003 和后续 Fusion 的验证重点
+
+详细边界见 `docs/CODEX_B_PHASE2_ERROR_ANALYSIS.md`。
+
+### 成员 C：IR / Depth Trainable Preprocessing
+
+- [ ] 提供 deterministic IR-only trainable interface
+- [ ] 提供 format-aware Depth-only trainable interface
+- [ ] 明确 PNG uint16 与 JPG uint8 的不同处理策略
+- [ ] 将 Depth 预处理候选实现为独立可配置开关
+- [ ] 完成接口 smoke tests
+- [ ] 给出 E002/E003 默认候选建议
+
+详细边界见 `docs/CODEX_C_PHASE2_MODALITY_PREPROCESSING.md`。
+
+### 依赖关系
+
+```text
+C 的 IR interface
+→ A 才能正式执行 E002
+
+C 的 Depth interface
+→ A 才能正式执行 E003
+
+B 的 E001 CLEAN error analysis 可与 C 并行
+```
+
+### Phase 2 Gate
+
+以下事项全部完成后才允许进入 Fusion：
+
+1. [ ] E001 CLEAN error analysis
+2. [ ] IR preprocessing review
+3. [ ] Depth preprocessing review
+4. [ ] E002 IR-only
+5. [ ] E003 Depth-only
+6. [ ] RGB / IR / Depth unified comparison
+7. [ ] Phase 2 conclusion
 
 ---
 
-## 4. Phase 3 - E001 RGB Baseline
+## Phase 3：Simple Multimodal Baselines
 
-前置条件：
-
-- 数据检查完成；
-- 固定 split 已进入 `main`；
-- RGB baseline 工程可运行；
-- 训练环境验证通过。
-
-执行：
-
-- [ ] `E001_rgb_baseline.yaml`
-- [ ] RGB full training
-- [ ] validation
-- [ ] per-class AP
-- [ ] inference
-- [ ] 生成官方格式 TXT
-- [ ] submission format check
-- [ ] 初赛第一次提交
-- [ ] 确认成绩高于官方 baseline
-
----
-
-## 5. Phase 4 - 单模态消融
-
-- [ ] E002 IR-only
-- [ ] E003 Depth-only
-- [ ] 比较 RGB / IR / Depth 的 per-class AP
-- [ ] 结合三模态统计解释差异
-
----
-
-## 6. Phase 5 - 简单多模态 Baseline
+Phase 2 gate 通过后，按 Phase 2 结论决定优先顺序：
 
 - [ ] E004 RGB+IR
 - [ ] E005 RGB+Depth
 - [ ] E006 RGB+IR+Depth Early Fusion
 - [ ] 建立完整消融表
 
+当前不得提前启动 E004/E005/E006。
+
 ---
 
-## 7. Phase 6 - Feature Fusion
+## Phase 4：Feature Fusion
 
-根据 E001~E006 结果选择候选方法：
+根据 E001～E006 结果选择候选方法：
 
 - [ ] Add
 - [ ] Concat + 1x1 Conv
@@ -115,9 +118,7 @@
 
 ---
 
-## 8. Phase 7 - Adaptive / Reliability Fusion
-
-重点候选方向：
+## Phase 5：Adaptive / Reliability Fusion
 
 - [ ] Modality Quality
 - [ ] Adaptive Weight
@@ -126,9 +127,9 @@
 
 ---
 
-## 9. Phase 8 - 专项优化
+## Phase 6：专项优化
 
-根据数据统计和验证结果选择：
+根据固定 val 的实验结果选择：
 
 - [ ] P2 Head / 小目标
 - [ ] 输入分辨率
@@ -138,24 +139,13 @@
 
 ---
 
-## 10. Phase 9 - Leaderboard
+## Phase 7：Leaderboard 与复赛准备
 
-- [ ] 记录每次正式提交
+- [ ] 记录每次正式 submission
 - [ ] 以固定 val 为主要模型选择依据
-- [ ] 排行榜用于阶段验证
-- [ ] 保持泛化优先
-- [ ] 保留提交对应的 commit、配置和权重
+- [ ] 保留 submission 对应的 commit、配置和权重说明
+- [ ] 整理训练代码、推理代码和环境说明
+- [ ] 整理消融实验表、模型架构图、创新点和局限性
+- [ ] 准备技术报告
 
----
-
-## 11. Phase 10 - 复赛 / 半决赛准备
-
-- [ ] 完整训练代码
-- [ ] 完整推理代码
-- [ ] 环境说明
-- [ ] 模型权重说明
-- [ ] 消融实验表
-- [ ] 模型架构图
-- [ ] 创新点说明
-- [ ] 局限性说明
-- [ ] 技术报告
+测试集只允许用于 inference 和 submission，leaderboard 不得替代固定 val。
