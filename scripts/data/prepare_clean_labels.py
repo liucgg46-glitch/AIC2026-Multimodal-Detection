@@ -161,9 +161,9 @@ def main() -> None:
                 output_lines.append(line)
 
         suffix = "\n" if source_text.endswith(("\n", "\r")) or output_lines else ""
-        (OUTPUT_DIR / source_path.name).write_text(
-            "\n".join(output_lines) + suffix, encoding="utf-8", newline="\n"
-        )
+        output_path = OUTPUT_DIR / source_path.name
+        with output_path.open("w", encoding="utf-8", newline="\n") as stream:
+            stream.write("\n".join(output_lines) + suffix)
 
     if applied_clip_lines != CLIP_LINES:
         raise RuntimeError(f"Missing clip rows: {sorted(CLIP_LINES - applied_clip_lines)}")
