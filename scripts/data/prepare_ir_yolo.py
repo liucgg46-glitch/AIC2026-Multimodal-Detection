@@ -27,15 +27,16 @@ CANONICAL_OUTPUT_RELATIVE = Path("data/processed/ir_trainable/raw3")
 CANONICAL_IR_TRAIN_PARENT_RELATIVE = Path("data/raw/train")
 IR_TRAINABLE_ROOT_RELATIVE = Path("data/processed/ir_trainable")
 
-CANONICAL_TRAIN_SPLIT_SHA256 = "f34d3edae8ebd182a258fc7a03d200e313b2635c18831360ae72bd9cb29cb64e"
-CANONICAL_VAL_SPLIT_SHA256 = "e6d7222de1bd8eb1c1f63346d32fdbeccb0121b21ffcd0777e55961b3d2156d9"
+# SHA-256 of normalized logical content, intentionally independent of CRLF/LF.
+CANONICAL_TRAIN_NORMALIZED_SHA256 = "20b0c1fb09a6848a4700a5adc8ce1f9a6d9040a48626a1759020d7f986450969"
+CANONICAL_VAL_NORMALIZED_SHA256 = "336165b3509b6a0516b052c02fd98d152441300e8ae757eb0d27ca68a053ee48"
 CANONICAL_LABELS_CLEAN_SHA256 = "6a670b95b33e803e5d25fc30d7bbd7985cbc4799234c37ff42b3b1c9204025a4"
 
 IR_IMAGE_EXTENSIONS = {".jpeg", ".jpg", ".png"}
 EXPECTED_TRAIN_COUNT = 1600
 EXPECTED_VAL_COUNT = 400
-MANIFEST_SCHEMA_VERSION = 2
-SCRIPT_VERSION = "1.1"
+MANIFEST_SCHEMA_VERSION = 3
+SCRIPT_VERSION = "1.2"
 
 # Canonical class-id order already used by the E001 RGB preparation pipeline.
 CLASS_NAMES = (
@@ -59,19 +60,20 @@ class IRDatasetViewError(ValueError):
 
 
 def canonical_paths() -> Dict[str, Path]:
-    """Resolve canonical project-relative paths for the current checkout."""
+    """Construct trusted lexical paths from the script-derived project root."""
+    root = _resolve_path(PROJECT_ROOT)
     return {
-        "project_root": PROJECT_ROOT.resolve(),
-        "data": (PROJECT_ROOT / "data").resolve(),
-        "data_processed": (PROJECT_ROOT / "data/processed").resolve(),
-        "raw_root": (PROJECT_ROOT / "data/raw").resolve(),
-        "ir_train_parent": (PROJECT_ROOT / CANONICAL_IR_TRAIN_PARENT_RELATIVE).resolve(),
-        "ir_dir": (PROJECT_ROOT / CANONICAL_IR_RELATIVE).resolve(),
-        "label_dir": (PROJECT_ROOT / CANONICAL_LABEL_RELATIVE).resolve(),
-        "train_split": (PROJECT_ROOT / CANONICAL_TRAIN_SPLIT_RELATIVE).resolve(),
-        "val_split": (PROJECT_ROOT / CANONICAL_VAL_SPLIT_RELATIVE).resolve(),
-        "ir_trainable_root": (PROJECT_ROOT / IR_TRAINABLE_ROOT_RELATIVE).resolve(),
-        "output_root": (PROJECT_ROOT / CANONICAL_OUTPUT_RELATIVE).resolve(),
+        "project_root": root,
+        "data": root / "data",
+        "data_processed": root / "data/processed",
+        "raw_root": root / "data/raw",
+        "ir_train_parent": root / CANONICAL_IR_TRAIN_PARENT_RELATIVE,
+        "ir_dir": root / CANONICAL_IR_RELATIVE,
+        "label_dir": root / CANONICAL_LABEL_RELATIVE,
+        "train_split": root / CANONICAL_TRAIN_SPLIT_RELATIVE,
+        "val_split": root / CANONICAL_VAL_SPLIT_RELATIVE,
+        "ir_trainable_root": root / IR_TRAINABLE_ROOT_RELATIVE,
+        "output_root": root / CANONICAL_OUTPUT_RELATIVE,
     }
 
 
@@ -85,14 +87,31 @@ def _normalized_absolute(path: Path) -> str:
     return os.path.normcase(os.path.abspath(str(path)))
 
 
+def _resolve_path(path: Path) -> Path:
+    """Resolve symlinks and junction-like redirections for safety checks."""
+    return path.resolve()
+
+
 def _same_path(first: Path, second: Path) -> bool:
-    return os.path.normcase(str(first.resolve())) == os.path.normcase(str(second.resolve()))
+    return os.path.normcase(str(_resolve_path(first))) == os.path.normcase(str(_resolve_path(second)))
+
+
+def _is_within(path: Path, parent: Path) -> bool:
+    resolved_path = _resolve_path(path)
+    resolved_parent = _resolve_path(parent)
+    if _same_path(resolved_path, resolved_parent):
+        return True
+    try:
+        resolved_path.relative_to(resolved_parent)
+        return True
+    except ValueError:
+        return False
 
 
 def _paths_overlap(first: Path, second: Path) -> bool:
     """Return whether either resolved path contains the other."""
-    left = first.resolve()
-    right = second.resolve()
+    left = _resolve_path(first)
+    right = _resolve_path(second)
     if _same_path(left, right):
         return True
     try:
@@ -123,6 +142,27 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def normalize_split_content(content: Union[str, bytes]) -> bytes:
+    """Normalize only newline encoding and retain exactly one final line terminator."""
+    if isinstance(content, bytes):
+        try:
+            text = content.decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise IRDatasetViewError("Split 必须是 UTF-8 文本") from exc
+    else:
+        text = content.lstrip("\ufeff")
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    logical_lines = text.split("\n")
+    if text.endswith("\n"):
+        logical_lines = logical_lines[:-1]
+    return ("\n".join(logical_lines) + "\n").encode("utf-8")
+
+
+def normalized_split_sha256(path: Path) -> str:
+    """Hash the canonical logical split content independent of newline style."""
+    return hashlib.sha256(normalize_split_content(path.read_bytes())).hexdigest()
+
+
 def project_relative_path(path: Path) -> str:
     """Return a machine-independent project-relative path for manifest identity."""
     try:
@@ -136,14 +176,56 @@ def validate_canonical_inputs(label_dir: Path, train_split: Path, val_split: Pat
     _require_canonical_path(label_dir, paths["label_dir"], "label-dir")
     _require_canonical_path(train_split, paths["train_split"], "train split")
     _require_canonical_path(val_split, paths["val_split"], "val split")
-    if not train_split.is_file() or sha256_file(train_split) != CANONICAL_TRAIN_SPLIT_SHA256:
+    if (
+        not train_split.is_file()
+        or normalized_split_sha256(train_split) != CANONICAL_TRAIN_NORMALIZED_SHA256
+    ):
         raise IRDatasetViewError(
-            "canonical train split SHA-256 不一致；拒绝使用被替换或篡改的 split"
+            "canonical train split normalized logical-content SHA-256 不一致；"
+            "拒绝使用被替换或篡改的 split"
         )
-    if not val_split.is_file() or sha256_file(val_split) != CANONICAL_VAL_SPLIT_SHA256:
+    if (
+        not val_split.is_file()
+        or normalized_split_sha256(val_split) != CANONICAL_VAL_NORMALIZED_SHA256
+    ):
         raise IRDatasetViewError(
-            "canonical val split SHA-256 不一致；拒绝使用被替换或篡改的 split"
+            "canonical val split normalized logical-content SHA-256 不一致；"
+            "拒绝使用被替换或篡改的 split"
         )
+
+
+def validate_staging_boundary(output_root: Path) -> None:
+    """Anchor the writable staging boundary at PROJECT_ROOT plus fixed relative paths."""
+    paths = canonical_paths()
+    project_root = _resolve_path(paths["project_root"])
+    expected_output = paths["output_root"]
+    if _normalized_absolute(output_root) != _normalized_absolute(expected_output):
+        raise IRDatasetViewError(f"输出目录必须是 canonical raw3 view: {expected_output}")
+
+    critical_paths = (
+        paths["project_root"],
+        paths["data"],
+        paths["data_processed"],
+        paths["ir_trainable_root"],
+        paths["output_root"],
+    )
+    for path in critical_paths:
+        if not _is_within(path, project_root):
+            raise IRDatasetViewError(
+                f"canonical staging 关键路径 resolve 后逃出 PROJECT_ROOT: {path}"
+            )
+
+    resolved_staging_root = _resolve_path(paths["ir_trainable_root"])
+    resolved_output = _resolve_path(output_root)
+    if resolved_output.parent != resolved_staging_root:
+        raise IRDatasetViewError(
+            "canonical raw3 view 的父目录被 symlink 或 junction 重定向"
+        )
+    expected_resolved_location = resolved_staging_root / "raw3"
+    if _normalized_absolute(resolved_output) != _normalized_absolute(expected_resolved_location):
+        raise IRDatasetViewError("canonical raw3 view 不得通过 symlink 或 junction 重定向")
+    if output_root.is_symlink():
+        raise IRDatasetViewError("canonical raw3 view 不得是 symlink 或重定向路径")
 
 
 def validate_output_path(
@@ -154,6 +236,7 @@ def validate_output_path(
     val_split: Path,
 ) -> None:
     """Reject non-canonical output and every source/output overlap after resolution."""
+    validate_staging_boundary(output_root)
     paths = canonical_paths()
     exact_forbidden = {
         "project root": paths["project_root"],
@@ -177,21 +260,6 @@ def validate_output_path(
         if _paths_overlap(output_root, source):
             raise IRDatasetViewError(f"输出目录与受保护的 {label} 路径重叠: {output_root}")
 
-    expected = PROJECT_ROOT / CANONICAL_OUTPUT_RELATIVE
-    if _normalized_absolute(output_root) != _normalized_absolute(expected):
-        raise IRDatasetViewError(f"输出目录必须是 canonical raw3 view: {expected}")
-    if not _same_path(output_root, expected):
-        raise IRDatasetViewError(f"输出目录 resolve 后不是 canonical raw3 view: {expected}")
-    resolved_allowed_root = paths["ir_trainable_root"].resolve()
-    resolved_expected_location = resolved_allowed_root / "raw3"
-    if _normalized_absolute(output_root.resolve()) != _normalized_absolute(resolved_expected_location):
-        raise IRDatasetViewError("canonical raw3 view 不得通过 symlink 或 junction 重定向")
-    if output_root.resolve().parent != resolved_allowed_root:
-        raise IRDatasetViewError("canonical raw3 view resolve 后越出 ir_trainable 根目录")
-    if output_root.is_symlink():
-        raise IRDatasetViewError("canonical raw3 view 不得是 symlink 或重定向路径")
-
-
 def validate_force_target(
     output_root: Path,
     ir_dir: Path,
@@ -209,8 +277,16 @@ def validate_force_target(
 
 
 def _validate_temporary_staging(staging: Path) -> None:
-    allowed = canonical_paths()["ir_trainable_root"]
-    if staging.is_symlink() or staging.resolve().parent != allowed:
+    validate_staging_boundary(canonical_paths()["output_root"])
+    paths = canonical_paths()
+    project_root = _resolve_path(paths["project_root"])
+    allowed = _resolve_path(paths["ir_trainable_root"])
+    resolved_staging = _resolve_path(staging)
+    if (
+        staging.is_symlink()
+        or resolved_staging.parent != allowed
+        or not _is_within(resolved_staging, project_root)
+    ):
         raise IRDatasetViewError(f"临时 staging 越出 canonical ir_trainable 根目录: {staging}")
     if not staging.name.startswith(".raw3-"):
         raise IRDatasetViewError(f"拒绝清理非 raw3 临时目录: {staging}")
@@ -453,10 +529,10 @@ def build_manifest(
         "total_count": validation["total_count"],
         "train_count": validation["train_count"],
         "train_split_path": project_relative_path(train_split),
-        "train_split_sha256": sha256_file(train_split),
+        "train_split_normalized_sha256": normalized_split_sha256(train_split),
         "val_count": validation["val_count"],
         "val_split_path": project_relative_path(val_split),
-        "val_split_sha256": sha256_file(val_split),
+        "val_split_normalized_sha256": normalized_split_sha256(val_split),
     }
 
 
@@ -479,11 +555,11 @@ def build_view(
     expected_val_count: int = EXPECTED_VAL_COUNT,
 ) -> Dict[str, Any]:
     """Validate canonical inputs before atomically publishing an isolated raw3 view."""
+    validate_output_path(output_root, ir_dir, label_dir, train_split, val_split)
     if representation != "raw3":
         raise IRDatasetViewError(f"当前 C1 仅实现 representation=raw3: {representation}")
     if link_mode not in {"auto", "hardlink", "copy"}:
         raise IRDatasetViewError(f"不支持的 link mode: {link_mode}")
-    validate_output_path(output_root, ir_dir, label_dir, train_split, val_split)
     validate_canonical_inputs(label_dir, train_split, val_split)
     if output_root.exists() and not force:
         raise IRDatasetViewError(f"输出目录已存在；如需重建请显式使用 --force: {output_root}")
@@ -499,7 +575,10 @@ def build_view(
     output_root.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=".raw3-", dir=str(output_root.parent)))
     methods = Counter()
+    staging_is_safe = False
     try:
+        _validate_temporary_staging(staging)
+        staging_is_safe = True
         for subset in ("train", "val"):
             image_out = staging / "images" / subset
             label_out = staging / "labels" / subset
@@ -536,9 +615,12 @@ def build_view(
         if output_root.exists():
             validate_force_target(output_root, ir_dir, label_dir, train_split, val_split)
             shutil.rmtree(output_root)
+        validate_output_path(output_root, ir_dir, label_dir, train_split, val_split)
+        _validate_temporary_staging(staging)
         staging.replace(output_root)
     except Exception:
-        _remove_temporary_staging(staging)
+        if staging_is_safe:
+            _remove_temporary_staging(staging)
         raise
     return {"manifest": manifest, "methods": methods, "validation": validation}
 

@@ -57,13 +57,13 @@ def digest_tree(root: Path) -> List[Tuple[str, int, str]]:
 def configure_contract_hashes(monkeypatch: pytest.MonkeyPatch, paths: Dict[str, Path]) -> None:
     monkeypatch.setattr(
         MODULE,
-        "CANONICAL_TRAIN_SPLIT_SHA256",
-        MODULE.sha256_file(paths["train_split"]),
+        "CANONICAL_TRAIN_NORMALIZED_SHA256",
+        MODULE.normalized_split_sha256(paths["train_split"]),
     )
     monkeypatch.setattr(
         MODULE,
-        "CANONICAL_VAL_SPLIT_SHA256",
-        MODULE.sha256_file(paths["val_split"]),
+        "CANONICAL_VAL_NORMALIZED_SHA256",
+        MODULE.normalized_split_sha256(paths["val_split"]),
     )
     labels = list(MODULE.index_labels(paths["label_dir"]).values())
     identity, _ = MODULE._aggregate_paths(labels)
@@ -137,15 +137,77 @@ def build_canonical(
     )
 
 
-def test_official_fixed_split_sha_constants_match_repository() -> None:
-    assert MODULE.CANONICAL_TRAIN_SPLIT_SHA256 == (
-        "f34d3edae8ebd182a258fc7a03d200e313b2635c18831360ae72bd9cb29cb64e"
+def test_official_normalized_split_sha_constants_match_repository() -> None:
+    assert MODULE.CANONICAL_TRAIN_NORMALIZED_SHA256 == (
+        "20b0c1fb09a6848a4700a5adc8ce1f9a6d9040a48626a1759020d7f986450969"
     )
-    assert MODULE.CANONICAL_VAL_SPLIT_SHA256 == (
-        "e6d7222de1bd8eb1c1f63346d32fdbeccb0121b21ffcd0777e55961b3d2156d9"
+    assert MODULE.CANONICAL_VAL_NORMALIZED_SHA256 == (
+        "336165b3509b6a0516b052c02fd98d152441300e8ae757eb0d27ca68a053ee48"
     )
-    assert MODULE.sha256_file(REPO_ROOT / "data/splits/train.txt") == MODULE.CANONICAL_TRAIN_SPLIT_SHA256
-    assert MODULE.sha256_file(REPO_ROOT / "data/splits/val.txt") == MODULE.CANONICAL_VAL_SPLIT_SHA256
+    assert MODULE.normalized_split_sha256(
+        REPO_ROOT / "data/splits/train.txt"
+    ) == MODULE.CANONICAL_TRAIN_NORMALIZED_SHA256
+    assert MODULE.normalized_split_sha256(
+        REPO_ROOT / "data/splits/val.txt"
+    ) == MODULE.CANONICAL_VAL_NORMALIZED_SHA256
+
+
+def test_normalized_split_identity_is_newline_style_independent(tmp_path: Path) -> None:
+    logical_lines = ["alpha", "beta value", "gamma"]
+    variants = {
+        "lf": "\n".join(logical_lines) + "\n",
+        "crlf": "\r\n".join(logical_lines) + "\r\n",
+        "mixed": "alpha\r\nbeta value\ngamma\r\n",
+    }
+    identities = []
+    for name, content in variants.items():
+        path = tmp_path / f"{name}.txt"
+        path.write_bytes(content.encode("utf-8"))
+        identities.append(MODULE.normalized_split_sha256(path))
+    assert len(set(identities)) == 1
+    assert MODULE.normalize_split_content(variants["lf"]) == b"alpha\nbeta value\ngamma\n"
+    assert MODULE.normalize_split_content("alpha\nbeta value\ngamma") == (
+        b"alpha\nbeta value\ngamma\n"
+    )
+    assert MODULE.normalize_split_content("alpha\nbeta value\ngamma\n\n") == (
+        b"alpha\nbeta value\ngamma\n\n"
+    )
+
+
+def test_normalized_split_identity_preserves_content_and_order(tmp_path: Path) -> None:
+    variants = {
+        "canonical": "alpha\nbeta\ngamma\n",
+        "changed_stem": "alpha\nbeta\ndelta\n",
+        "added_line": "alpha\nbeta\ngamma\nextra\n",
+        "removed_line": "alpha\nbeta\n",
+        "reordered": "beta\nalpha\ngamma\n",
+        "changed_whitespace": "alpha\nbeta \ngamma\n",
+    }
+    identities = {}
+    for name, content in variants.items():
+        path = tmp_path / f"{name}.txt"
+        path.write_bytes(content.encode("utf-8"))
+        identities[name] = MODULE.normalized_split_sha256(path)
+    assert len(set(identities.values())) == len(identities)
+
+
+def test_train_and_val_validation_share_normalized_hash_helper(
+    canonical_project: Dict[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = MODULE.normalized_split_sha256
+    calls = []
+
+    def recording_helper(path: Path) -> str:
+        calls.append(path)
+        return original(path)
+
+    monkeypatch.setattr(MODULE, "normalized_split_sha256", recording_helper)
+    MODULE.validate_canonical_inputs(
+        canonical_project["label_dir"],
+        canonical_project["train_split"],
+        canonical_project["val_split"],
+    )
+    assert calls == [canonical_project["train_split"], canonical_project["val_split"]]
 
 
 def test_canonical_labels_and_splits_build_successfully(
@@ -207,8 +269,37 @@ def test_canonical_split_content_tampering_is_rejected_by_sha(
 ) -> None:
     with canonical_project[split_name].open("a", encoding="utf-8", newline="\n") as stream:
         stream.write("tampered\n")
-    expected = "train split SHA-256" if split_name == "train_split" else "val split SHA-256"
+    expected = (
+        "train split normalized logical-content SHA-256"
+        if split_name == "train_split"
+        else "val split normalized logical-content SHA-256"
+    )
     with pytest.raises(MODULE.IRDatasetViewError, match=expected):
+        MODULE.validate_canonical_inputs(
+            canonical_project["label_dir"],
+            canonical_project["train_split"],
+            canonical_project["val_split"],
+        )
+
+
+@pytest.mark.parametrize(
+    "mutated_content",
+    [
+        "changed_stem\ntrain_png\n",
+        "train_jpg\ntrain_png\nadded\n",
+        "train_jpg\n",
+        "train_png\ntrain_jpg\n",
+    ],
+)
+def test_real_split_content_change_add_remove_and_reorder_are_rejected(
+    canonical_project: Dict[str, Path],
+    mutated_content: str,
+) -> None:
+    write_text_lf(canonical_project["train_split"], mutated_content)
+    with pytest.raises(
+        MODULE.IRDatasetViewError,
+        match="train split normalized logical-content SHA-256",
+    ):
         MODULE.validate_canonical_inputs(
             canonical_project["label_dir"],
             canonical_project["train_split"],
@@ -515,6 +606,92 @@ def test_symlinked_canonical_output_to_source_is_rejected_when_supported(
         )
 
 
+@pytest.mark.parametrize("redirected_key", ["data_processed", "ir_trainable", "output"])
+def test_direct_build_rejects_redirected_staging_path_before_mutation(
+    canonical_project: Dict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+    redirected_key: str,
+) -> None:
+    redirected_paths = {
+        "data_processed": canonical_project["root"] / "data/processed",
+        "ir_trainable": canonical_project["output"].parent,
+        "output": canonical_project["output"],
+    }
+    redirected = redirected_paths[redirected_key]
+    external = canonical_project["root"].parent / f"external-{redirected_key}"
+    sentinel = external / "keep.txt"
+    write_text_lf(sentinel, "unchanged")
+    original_resolve = MODULE._resolve_path
+
+    def resolve_with_redirect(path: Path) -> Path:
+        if MODULE._normalized_absolute(path) == MODULE._normalized_absolute(redirected):
+            return external
+        return original_resolve(path)
+
+    monkeypatch.setattr(MODULE, "_resolve_path", resolve_with_redirect)
+    with pytest.raises(MODULE.IRDatasetViewError, match="逃出|重定向"):
+        build_canonical(canonical_project, force=True)
+
+    assert sentinel.read_text(encoding="utf-8") == "unchanged"
+    assert not canonical_project["output"].exists()
+    assert not list(canonical_project["output"].parent.glob(".raw3-*"))
+
+
+def test_cli_reuses_direct_build_staging_boundary_check(
+    canonical_project: Dict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture,
+) -> None:
+    redirected = canonical_project["output"].parent
+    external = canonical_project["root"].parent / "external-cli"
+    sentinel = external / "keep.txt"
+    write_text_lf(sentinel, "unchanged")
+    original_resolve = MODULE._resolve_path
+
+    def resolve_with_redirect(path: Path) -> Path:
+        if MODULE._normalized_absolute(path) == MODULE._normalized_absolute(redirected):
+            return external
+        return original_resolve(path)
+
+    monkeypatch.setattr(MODULE, "_resolve_path", resolve_with_redirect)
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT), "--force"])
+
+    assert MODULE.main() == 2
+    assert "逃出" in capsys.readouterr().err
+    assert sentinel.read_text(encoding="utf-8") == "unchanged"
+    assert not canonical_project["output"].exists()
+
+
+def test_cleanup_rejects_redirected_temporary_staging_without_rmtree(
+    canonical_project: Dict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    staging = canonical_project["output"].parent / ".raw3-unsafe"
+    staging.mkdir()
+    external = canonical_project["root"].parent / "external-temp"
+    sentinel = external / "keep.txt"
+    write_text_lf(sentinel, "unchanged")
+    original_resolve = MODULE._resolve_path
+    removed = []
+
+    def resolve_with_redirect(path: Path) -> Path:
+        if MODULE._normalized_absolute(path) == MODULE._normalized_absolute(staging):
+            return external
+        return original_resolve(path)
+
+    def record_rmtree(path: Path) -> None:
+        removed.append(path)
+
+    monkeypatch.setattr(MODULE, "_resolve_path", resolve_with_redirect)
+    monkeypatch.setattr(MODULE.shutil, "rmtree", record_rmtree)
+    with pytest.raises(MODULE.IRDatasetViewError, match="临时 staging 越出"):
+        MODULE._remove_temporary_staging(staging)
+
+    assert removed == []
+    assert sentinel.read_text(encoding="utf-8") == "unchanged"
+    assert staging.exists()
+
+
 def test_manifest_is_byte_deterministic_and_machine_independent(
     canonical_project: Dict[str, Path],
 ) -> None:
@@ -527,6 +704,14 @@ def test_manifest_is_byte_deterministic_and_machine_independent(
     assert first["manifest"] == second["manifest"]
     assert b"created_at" not in first_bytes
     parsed = json.loads(first_bytes)
+    assert parsed["train_split_normalized_sha256"] == MODULE.normalized_split_sha256(
+        canonical_project["train_split"]
+    )
+    assert parsed["val_split_normalized_sha256"] == MODULE.normalized_split_sha256(
+        canonical_project["val_split"]
+    )
+    assert "train_split_sha256" not in parsed
+    assert "val_split_sha256" not in parsed
     for key in ("source_ir_dir", "label_dir", "train_split_path", "val_split_path"):
         assert not Path(parsed[key]).is_absolute()
         assert "\\" not in parsed[key]
