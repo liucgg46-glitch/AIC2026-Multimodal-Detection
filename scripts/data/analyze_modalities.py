@@ -892,6 +892,23 @@ def local_edge_registration(
     }
 
 
+def sanitize_registration_result(result: dict[str, Any]) -> dict[str, Any]:
+    """Remove untrusted floating estimates from an unreliable serialized result."""
+    serialized = dict(result)
+    if not bool(serialized.get("reliable", False)):
+        for key in (
+            "dx",
+            "dy",
+            "magnitude",
+            "confidence",
+            "edge_correlation",
+            "peak_margin",
+            "peak_ratio",
+        ):
+            serialized[key] = None
+    return serialized
+
+
 def parse_labels(path: Path, messages: list[str]) -> list[tuple[int, float, float, float, float]]:
     boxes: list[tuple[int, float, float, float, float]] = []
     for line_number, raw_line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), start=1):
@@ -1332,7 +1349,8 @@ def generate_report(summary: dict[str, Any], c4_review: dict[str, Any] | None = 
             "6. 后续正式实验必须沿用固定 split，通过 E002～E006 逐项验证模态专用预处理和融合方案，不得根据 IR/Depth 偏移修改 Visible GT。",
         ]
     )
-    return "\n".join(lines) + "\n"
+    report = "\n".join(lines) + "\n"
+    return report.replace("\r\n", "\n").replace("\r", "\n")
 
 
 def parse_args() -> argparse.Namespace:
@@ -1541,6 +1559,7 @@ def main() -> None:
             "depth_fov_ratio": borders["depth"]["fov_ratio"],
         }
         for prefix, result in registrations.items():
+            serialized_result = sanitize_registration_result(result)
             for key in (
                 "dx",
                 "dy",
@@ -1552,7 +1571,7 @@ def main() -> None:
                 "reliable",
                 "reason",
             ):
-                row[f"{prefix}_{key}"] = result.get(key)
+                row[f"{prefix}_{key}"] = serialized_result.get(key)
         for prefix in ("reg_ir", "reg_depth"):
             if prefix not in registrations:
                 for key in (
