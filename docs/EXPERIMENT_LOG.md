@@ -242,25 +242,25 @@ Important reproduction note：正式 submission 推理时，服务器已应用�
 
 PR #6 已进入 `main`。Phase 1 final main 为 `560d9a92c78af0b392bf8678dd9772d5945ba3e6`，但该 commit 不是 E001 训练时的 commit。
 
-## 5. E002_IR_YOLO11N_CLEAN — planned / frozen after commit
+## 5. E002_IR_YOLO11N_CLEAN — completed
 
 | Field | Value |
 | --- | --- |
-| Status | Planned; configuration frozen by the commit containing this section; full training not executed |
+| Status | Completed; results supplied by the user on 2026-09-12 |
 | Date | 2026-09-12 |
 | Branch | `feature/phase2-experiments` |
 | Preparation base | `6eaa6f054bef3b3b8f35290f040d20fb3ff81f0c` (not the E002 training commit) |
-| E002 training commit | Use the containing Git commit SHA (reported after commit); server must checkout that exact SHA |
+| E002 training commit | `62abdac3eb638ac09e2da815cff9687175ff3f6f` |
 | Config | `configs/experiments/E002_IR_YOLO11N_CLEAN.yaml` |
-| Model / initial weights | YOLO11n pretrained; same E001 initial `yolo11n.pt` artifact, placed at `weights/yolo11n.pt`; SHA-256 verification pending |
+| Model / initial weights | YOLO11n pretrained; same E001 initial `yolo11n.pt` artifact, placed at `weights/yolo11n.pt`; SHA-256 confirmed below |
 | Input | IR-only, C1 `raw3`, preprocessing=none, staging=copy, isolation=true |
 | Dataset YAML | `data/processed/ir_trainable/raw3/data.yaml` |
 | Labels | `data/processed/train/labels_clean` |
 | Split | Existing 1600/400; seed=2026; no split regeneration |
-| Run name / checkpoint | `E002_IR_YOLO11N_CLEAN` / pending (not generated) |
-| Runtime / best epoch / metrics / per-class AP | pending |
-| Submission / leaderboard | none / unavailable |
-| Conclusion | pending; no performance conclusion before full training |
+| Run name / checkpoint | `E002_IR_YOLO11N_CLEAN` / `runs/E002_IR_YOLO11N_CLEAN/weights/best.pt` |
+| Runtime / best epoch / per-class AP | unavailable / 88 / unavailable |
+| Submission / leaderboard | S002 / 20.7870 |
+| Conclusion | Fixed-val IR raw3 mAP50-95=0.20181, below E001 CLEAN 0.37346; this does not establish a general conclusion about all IR representations. |
 
 ### E001 historical evidence recovered for E002
 
@@ -271,7 +271,7 @@ the historical record above. The E001 dataset argument was
 `data/processed/rgb_yolo_clean/data.yaml`; the initial weight artifact was
 `source_packages/yolo11n.pt` under the server's AIC2026 directory (personal absolute
 path intentionally omitted). E002 must reuse that initial artifact, not E001 best.pt.
-The weight content hash remains pending.
+The initial artifact hash was subsequently confirmed by the user; see the completion record below.
 
 Confirmed best-epoch results remain epoch=78, Precision=0.81605, Recall=0.55820,
 mAP50=0.61119, mAP50-95=0.37346.
@@ -308,7 +308,7 @@ major experimental variable is RGB -> IR raw3. Keep the recovered HSV augmentati
 parameters even for IR; do not add CLAHE, extra normalization or modality-specific
 augmentation. Fixed labels and split stay identical. No Fusion or prelim_test tuning.
 
-### Planned commands and gates (not executed)
+### Historical E002 preparation plan (retained; completion recorded below)
 
 Before training, confirm the local initial weights exist and match the E001 source
 artifact SHA-256; do not rely on automatic weight downloading. Prepare on the server
@@ -390,3 +390,130 @@ calls the unchanged `train_rgb.main()`. It neither downloads nor implements trai
 Hash equality requires comparison with the original server artifact; file presence
 alone is not a provenance check. Use this adapter for both smoke and full E002.
 The E001 entry and C1 remain unchanged. Initial weights are not committed.
+
+
+### E002 completion record — user-confirmed 2026-09-12
+
+These values were supplied by the user from the completed run; this local task did
+not rerun training, re-validation or submission. Historical metrics and later
+re-validation remain separate. Runtime, per-class AP and exact runtime environment
+are unavailable in this record.
+
+| Metric source | Best epoch | Precision | Recall | mAP50 | mAP50-95 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Historical training results.csv | 88 | 0.63125 | 0.32160 | 0.36203 | 0.20181 |
+| best.pt re-validation | — | 0.6334556548796438 | 0.32113402692552656 | 0.3612698128051061 | 0.20172330761354743 |
+
+| Artifact | SHA256 |
+| --- | --- |
+| Initial yolo11n.pt (same E001/E002 artifact) | `0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1` |
+| best.pt | `f330a07afa0dd985a7ab9d240593028769ed82268ad3c117a9e309adf0618881` |
+| last.pt | `d1d2f31df1d706a407f1f9c86e06c8b6a4655427ccad35787755512bd5dc6c34` |
+
+## 6. Submission S002
+
+| Field | Value |
+| --- | --- |
+| Internal name | `E002_IR_YOLO11N_CLEAN_PRELIM_001` |
+| Source experiment | `E002_IR_YOLO11N_CLEAN` |
+| Leaderboard score / rank | 20.7870 / 373 |
+| Submission time | 2026-09-12 11:12:21 |
+| Submission ZIP SHA256 | `6a0da1a7e5cd2e6dc466170dc5091af73481d2e30fdab25d176c17df5f319c86` |
+
+Leaderboard is recorded for submission provenance only, not parameter selection.
+
+## 7. E003_DEPTH_YOLO11N_CLEAN — frozen configuration, training pending
+
+| Field | Value |
+| --- | --- |
+| Date / branch | 2026-09-12 / `feature/phase2-experiments` |
+| Preparation HEAD | `305ff0602951fe07b1246b067b3542ca4ad833bc` |
+| Main base | `5e6dfa3d140c45f81667225635838524fe78b81f` |
+| Training code commit | The commit introducing this E003 config and adapter; resolve its full SHA from Git and verify server HEAD before execution. No training has run. |
+| Config / run name | `configs/experiments/E003_DEPTH_YOLO11N_CLEAN.yaml` / `E003_DEPTH_YOLO11N_CLEAN` |
+| Model | Same initial YOLO11n artifact at `weights/yolo11n.pt`; SHA256 `0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1` |
+| Staging directory | `data/processed/depth_trainable/inverse` |
+| Dataset / manifest | `data/processed/depth_trainable/inverse/data.yaml` / `data/processed/depth_trainable/inverse/manifest.json` |
+| Labels / split | `data/processed/train/labels_clean`; existing `data/splits/train.txt` (1600) and `data/splits/val.txt` (400) |
+| PNG policy | uint16 mm; valid=depth>0; clip valid depth to [300,19999]; reciprocal scaled with 1+floor(254*x+0.5); invalid=0, valid=[1,255]; repeat to uint8 x3 |
+| JPG policy | Physical unit unknown; byte-preserving passthrough, never interpreted as mm |
+| Staging isolation | Generated PNG; copied JPG and labels; no source modification |
+| GPU / runtime / metrics / per-class AP / checkpoint | pending; no E003 training or GPU smoke performed |
+| Conclusion | pending |
+
+C4 validation evidence: `outputs/analysis/depth_c2_c4_validation.json` and `.log`,
+produced by validation code `3a3662d896ed08d184cbcae3ea30b166662310f6`.
+The recorded inverse manifest SHA256 is
+`328f9cfc2d3a0861038d4c5af521a86700e2a538dc01f87283916568d3123e09`.
+This preparation checkout has no generated inverse staging; its manifest is not
+claimed to have been read locally. Paths and metadata are established by the C4
+builder and reviewed evidence. Server staging and manifest verification remain a gate.
+The evidence records 2000 decodable uint8 x3 outputs, fixed identities, no missing,
+duplicate or overlap, and real train/val Ultralytics batches. It is CPU loader
+validation in Python 3.10, not GPU training or exact historical E001 environment.
+
+| Controlled factor | E001 CLEAN | E002 | E003 |
+| --- | --- | --- | --- |
+| Input (only main variable) | RGB | IR raw3 | PNG inverse + JPG passthrough |
+| Initial model artifact | Same user-confirmed YOLO11n SHA256 above | Same | Same, enforced by wrapper |
+| Split / labels / seed | 1600/400 / labels_clean / 2026 | Same | Same |
+| epochs / batch / imgsz / workers / device | 100 / 32 / 640 / 8 / 0 | Same | Same |
+| Optimizer / scheduler / loss / augmentation / validation args | Recovered args documented above | Explicit formal YAML | All E002 YAML values unchanged |
+| Historical software provenance | Exact historical environment unavailable | Unavailable in this record | Record actual environment at server Gate |
+
+The E003 and E002 YAML mappings differ only in experiment_id, name and data.
+Keep optimizer=auto; do not infer its historical internal selection. The new thin
+`train_e003.py` checks the fixed inverse YAML, local weight SHA256 and fresh pretrained
+start, then delegates to unchanged `train_rgb.main()`. E002's frozen adapter remains
+unchanged. Missing dataset, missing/wrong weights and alternate candidates fail before
+model creation. No E001/E002 best.pt, downloads, Fusion or prelim_test tuning.
+
+### E003 future server commands — not executed in this task
+
+After local tests, review and commit + push: sync exactly that commit, verify server
+HEAD and clean status, inspect current CUDA/software environment, and stage:
+
+```bash
+python scripts/data/prepare_depth_candidate_yolo.py --candidate inverse
+```
+
+Default copy isolation is retained. Inspect existing staging before any explicit
+`--force`. Verify generated manifest identities and representation on the server.
+
+Derive a separate smoke config at runtime; leave formal YAML unchanged:
+
+```bash
+python -c "from pathlib import Path; import yaml; c=yaml.safe_load(Path('configs/experiments/E003_DEPTH_YOLO11N_CLEAN.yaml').read_text(encoding='utf-8')); c.update(experiment_id='SMOKE_DEPTH_001',name='SMOKE_DEPTH_001',epochs=1,fraction=0.04); p=Path('runs/SMOKE_DEPTH_001_config.yaml'); assert not p.exists(), 'smoke config already exists'; p.parent.mkdir(parents=True,exist_ok=True); p.write_text(yaml.safe_dump(c,sort_keys=False),encoding='utf-8')"
+python scripts/train/train_e003.py --config runs/SMOKE_DEPTH_001_config.yaml
+```
+
+Smoke uses about 64 train images, batch=32, imgsz=640, workers=8, AMP=true; fraction
+reduces train only, with 400 val images retained. Confirm behavior in the server
+Ultralytics version. Check CUDA/AMP, forward/backward, finite losses, no OOM, peak
+VRAM and checkpoint/log output. Short-run auto optimizer/scheduling may differ;
+smoke scores are not performance evidence. Never initialize full training from smoke.
+
+Only after the exact-SHA server Gate and successful GPU smoke:
+
+```bash
+python scripts/train/train_e003.py --config configs/experiments/E003_DEPTH_YOLO11N_CLEAN.yaml
+```
+
+This task stops after the tested E003 training commit is pushed. Bundle, server
+checkout/staging, GPU smoke, full training and test inference remain unexecuted.
+
+
+### E003 local freeze validation — 2026-09-12
+
+Configuration/preflight tests: 20 passed. Full repository tests: 200 passed,
+1 skipped (Windows symlink permission case). Model construction/training is mocked
+in configuration integration tests; no actual training or download occurred.
+Python 3.8 AST syntax checks passed for the adapter, shared entry and configuration
+tests; actual Python 3.8 server runtime remains a server Gate check.
+`git diff --check` passed. Successful `git fetch origin` confirmed main remains
+`5e6dfa3d140c45f81667225635838524fe78b81f`, already included in A's branch,
+with no divergence from the published A branch before this commit.
+Final review confirmed only the E003 config/adapter, config tests and experiment log
+changed; E001/E002 training code, C2-C4, split, labels and raw remain unchanged.
+No weights or generated staging are added to Git. The earlier E001 historical
+record and B/C analysis artifacts are retained.
