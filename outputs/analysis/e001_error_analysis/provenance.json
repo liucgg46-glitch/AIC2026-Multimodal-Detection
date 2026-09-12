@@ -1,0 +1,73 @@
+{
+  "historical_training_result": {
+    "source": "E001 historical training results.csv; row with maximum mAP50-95",
+    "best_epoch": 78,
+    "precision": 0.81605,
+    "recall": 0.5582,
+    "mAP50": 0.61119,
+    "mAP50-95": 0.37346,
+    "experiment": "E001_RGB_YOLO11N_CLEAN",
+    "checkpoint_path": "runs/E001_RGB_YOLO11N_CLEAN/weights/best.pt",
+    "checkpoint_sha256": "unavailable",
+    "dataset": "official Train_2000; data/processed/train/labels_clean",
+    "split": "data/splits/train.txt (1600) and data/splits/val.txt (400), seed=2026",
+    "imgsz": 640,
+    "device": "0 on NVIDIA GeForce RTX 3090 24GB server",
+    "training_command": "unavailable",
+    "python_version": "unavailable",
+    "torch_version": "unavailable",
+    "ultralytics_version": "unavailable",
+    "config_evidence": "args.yaml in E001_CLEAN_ERROR_ANALYSIS_EXPORT and docs/EXPERIMENT_LOG.md"
+  },
+  "analysis_export_revalidation": {
+    "metrics_source": "validation_metrics.json and per_class_metrics.csv in E001_CLEAN_ERROR_ANALYSIS_EXPORT",
+    "checkpoint_path_or_identity": "canonical runs/E001_RGB_YOLO11N_CLEAN/weights/best.pt according to experiment record; exact binding/hash is unavailable in the export package",
+    "validation_or_export_command": "unavailable",
+    "dataset": "fixed val=400; exported GT independently matched data/processed/train/labels_clean",
+    "imgsz": "unavailable",
+    "prediction_export_conf": "unavailable",
+    "validation_iou": "unavailable",
+    "max_det": "unavailable",
+    "device": "unavailable",
+    "python_version": "unavailable",
+    "torch_version": "unavailable",
+    "ultralytics_version": "unavailable",
+    "export_source": "E001_CLEAN_ERROR_ANALYSIS_EXPORT",
+    "observed_minimum_prediction_confidence": 0.0010001,
+    "note": "args.yaml records the historical training run; it is not evidence of the separate re-validation/export command.",
+    "metrics": {
+      "precision": 0.8172495551108875,
+      "recall": 0.5593378970958152,
+      "mAP50": 0.6114362820797138,
+      "mAP50-95": 0.37328908967812097,
+      "val_images": 400
+    }
+  },
+  "member_b_internal_matcher": {
+    "implementation": "scripts/analysis/analyze_e001_errors.py",
+    "prediction_confidence_gte": 0.25,
+    "matching_iou_gte": 0.5,
+    "high_confidence_fp_gte": 0.5,
+    "TP": 2040,
+    "FN": 1001,
+    "high_confidence_FP": 223
+  },
+  "imported_confusion": {
+    "source": "confusion_matrix.csv in E001_CLEAN_ERROR_ANALYSIS_EXPORT",
+    "threshold": "unavailable",
+    "matching_settings": "unavailable",
+    "diagonal_TP": 2086,
+    "background_row_misses": 920,
+    "comparability_note": "Not the same evaluator/operating point as the member B internal matcher; do not equate the counts."
+  },
+  "member_b_postprocessing_environment": {
+    "python": "3.10.21",
+    "torch": "2.14.0+cpu",
+    "ultralytics": "8.4.144",
+    "opencv": "5.0.0",
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "matplotlib": "3.10.9",
+    "scope": "Local post-processing and tests only; not the training/re-validation environment."
+  }
+}

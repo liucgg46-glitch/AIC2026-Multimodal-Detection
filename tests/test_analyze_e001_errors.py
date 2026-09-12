@@ -97,3 +97,19 @@ def test_clean_ground_truth_mismatch_fails(tmp_path):
 
     with pytest.raises(ValueError, match="differs from labels_clean"):
         MODULE.validate_clean_ground_truth(exported, tmp_path)
+
+
+def test_historical_metrics_use_best_map50_95_row(tmp_path):
+    results = tmp_path / "results.csv"
+    results.write_text(
+        "epoch,metrics/precision(B),metrics/recall(B),metrics/mAP50(B),metrics/mAP50-95(B)\n"
+        "1,0.8,0.5,0.6,0.3\n"
+        "2,0.7,0.6,0.65,0.4\n",
+        encoding="utf-8",
+    )
+
+    metrics = MODULE.read_historical_best_metrics(results)
+
+    assert metrics["best_epoch"] == 2
+    assert metrics["precision"] == 0.7
+    assert metrics["mAP50-95"] == 0.4

@@ -51,6 +51,7 @@ OPERATING_CONF = 0.25
 MATCH_IOU = 0.50
 HIGH_CONF_FP = 0.50
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
+UNAVAILABLE = "unavailable"
 
 
 def parse_args() -> argparse.Namespace:
@@ -86,6 +87,27 @@ def write_csv(path: Path, rows: list[dict[str, Any]], fields: Iterable[str]) -> 
         writer = csv.DictWriter(stream, fieldnames=list(fields))
         writer.writeheader()
         writer.writerows(rows)
+
+
+def read_historical_best_metrics(results_path: Path) -> dict[str, Any]:
+    """Read the canonical historical result without mixing it with re-validation."""
+    frame = pd.read_csv(results_path)
+    frame.columns = [column.strip() for column in frame.columns]
+    metric_columns = {
+        "precision": "metrics/precision(B)",
+        "recall": "metrics/recall(B)",
+        "mAP50": "metrics/mAP50(B)",
+        "mAP50-95": "metrics/mAP50-95(B)",
+    }
+    missing = [column for column in metric_columns.values() if column not in frame]
+    if missing:
+        raise ValueError(f"Historical results.csv lacks columns: {missing}")
+    best = frame.loc[frame[metric_columns["mAP50-95"]].idxmax()]
+    return {
+        "source": "E001 historical training results.csv; row with maximum mAP50-95",
+        "best_epoch": int(best["epoch"]),
+        **{name: float(best[column]) for name, column in metric_columns.items()},
+    }
 
 
 def xywhn_to_xyxy(box: Iterable[float]) -> np.ndarray:
@@ -439,6 +461,7 @@ def main() -> None:
     ground_truth_raw = read_json(export_dir / "val_ground_truth.json")
     per_class = pd.read_csv(export_dir / "per_class_metrics.csv")
     validation_metrics = read_json(export_dir / "validation_metrics.json")
+    historical_metrics = read_historical_best_metrics(export_dir / "results.csv")
     val_stems = [
         Path(line.strip()).stem
         for line in args.val_split.read_text(encoding="utf-8-sig").splitlines()
@@ -495,6 +518,8 @@ def main() -> None:
 
     confusion = pd.read_csv(export_dir / "confusion_matrix.csv", index_col=0)
     confusion.to_csv(output_dir / "confusion_matrix.csv", encoding="utf-8-sig")
+    imported_confusion_tp = int(round(sum(float(confusion.loc[name, name]) for name in CLASS_NAMES)))
+    imported_confusion_misses = int(round(sum(float(confusion.loc["background", name]) for name in CLASS_NAMES)))
     confusion_pairs: list[dict[str, Any]] = []
     for predicted in CLASS_NAMES:
         for true in CLASS_NAMES:
@@ -590,6 +615,7 @@ def main() -> None:
     image_frame.to_csv(output_dir / "image_difficulty_metrics.csv", index=False, encoding="utf-8-sig")
     low_light_cutoff = float(image_frame["mean_luminance"].quantile(0.10))
     low_contrast_cutoff = float(image_frame["grayscale_std"].quantile(0.10))
+    low_light_subset_count = int((image_frame["mean_luminance"] <= low_light_cutoff).sum())
     image_lookup = {row["image_stem"]: row for row in image_rows}
 
     hard_candidates: dict[str, list[str]] = {
@@ -648,12 +674,78 @@ def main() -> None:
     lowest_ap = per_class.nsmallest(5, "AP50-95")
     fn_class_counts = Counter(int(row["class_id"]) for row in fn_rows)
     high_fp_reasons = Counter(row["fp_reason"] for row in high_fp)
+    internal_tp = sum(row["status"] == "TP" for row in all_gt_results)
+    provenance = {
+        "historical_training_result": {
+            **historical_metrics,
+            "experiment": "E001_RGB_YOLO11N_CLEAN",
+            "checkpoint_path": "runs/E001_RGB_YOLO11N_CLEAN/weights/best.pt",
+            "checkpoint_sha256": UNAVAILABLE,
+            "dataset": "official Train_2000; data/processed/train/labels_clean",
+            "split": "data/splits/train.txt (1600) and data/splits/val.txt (400), seed=2026",
+            "imgsz": 640,
+            "device": "0 on NVIDIA GeForce RTX 3090 24GB server",
+            "training_command": UNAVAILABLE,
+            "python_version": UNAVAILABLE,
+            "torch_version": UNAVAILABLE,
+            "ultralytics_version": UNAVAILABLE,
+            "config_evidence": "args.yaml in E001_CLEAN_ERROR_ANALYSIS_EXPORT and docs/EXPERIMENT_LOG.md",
+        },
+        "analysis_export_revalidation": {
+            "metrics_source": "validation_metrics.json and per_class_metrics.csv in E001_CLEAN_ERROR_ANALYSIS_EXPORT",
+            "checkpoint_path_or_identity": "canonical runs/E001_RGB_YOLO11N_CLEAN/weights/best.pt according to experiment record; exact binding/hash is unavailable in the export package",
+            "validation_or_export_command": UNAVAILABLE,
+            "dataset": "fixed val=400; exported GT independently matched data/processed/train/labels_clean",
+            "imgsz": UNAVAILABLE,
+            "prediction_export_conf": UNAVAILABLE,
+            "validation_iou": UNAVAILABLE,
+            "max_det": UNAVAILABLE,
+            "device": UNAVAILABLE,
+            "python_version": UNAVAILABLE,
+            "torch_version": UNAVAILABLE,
+            "ultralytics_version": UNAVAILABLE,
+            "export_source": export_dir.name,
+            "observed_minimum_prediction_confidence": validation["minimum_export_confidence"],
+            "note": "args.yaml records the historical training run; it is not evidence of the separate re-validation/export command.",
+            "metrics": validation_metrics,
+        },
+        "member_b_internal_matcher": {
+            "implementation": "scripts/analysis/analyze_e001_errors.py",
+            "prediction_confidence_gte": OPERATING_CONF,
+            "matching_iou_gte": MATCH_IOU,
+            "high_confidence_fp_gte": HIGH_CONF_FP,
+            "TP": internal_tp,
+            "FN": len(fn_rows),
+            "high_confidence_FP": len(high_fp),
+        },
+        "imported_confusion": {
+            "source": "confusion_matrix.csv in E001_CLEAN_ERROR_ANALYSIS_EXPORT",
+            "threshold": UNAVAILABLE,
+            "matching_settings": UNAVAILABLE,
+            "diagonal_TP": imported_confusion_tp,
+            "background_row_misses": imported_confusion_misses,
+            "comparability_note": "Not the same evaluator/operating point as the member B internal matcher; do not equate the counts.",
+        },
+        "member_b_postprocessing_environment": {
+            "python": "3.10.21",
+            "torch": "2.14.0+cpu",
+            "ultralytics": "8.4.144",
+            "opencv": "5.0.0",
+            "numpy": "2.2.6",
+            "pandas": "2.3.3",
+            "matplotlib": "3.10.9",
+            "scope": "Local post-processing and tests only; not the training/re-validation environment.",
+        },
+    }
     summary = {
         "analysis_scope": "E001_RGB_YOLO11N_CLEAN fixed val only",
         "source_export_name": export_dir.name,
         "validation": validation,
         "operating_point": {"confidence": OPERATING_CONF, "iou": MATCH_IOU},
-        "global_metrics": validation_metrics,
+        "historical_training_metrics": historical_metrics,
+        "analysis_export_revalidation_metrics": validation_metrics,
+        "imported_confusion": provenance["imported_confusion"],
+        "internal_matcher_TP": internal_tp,
         "false_negatives_at_operating_point": len(fn_rows),
         "high_confidence_false_positives": len(high_fp),
         "high_confidence_fp_reasons": dict(high_fp_reasons),
@@ -666,6 +758,7 @@ def main() -> None:
         "correlations": correlations,
         "hard_case_thresholds": {
             "low_light_luminance_p10": low_light_cutoff,
+            "visible_defined_low_light_candidate_images": low_light_subset_count,
             "low_contrast_std_p10": low_contrast_cutoff,
         },
         "limitations": [
@@ -677,6 +770,7 @@ def main() -> None:
     }
     write_json(output_dir / "analysis_summary.json", summary)
     write_json(output_dir / "source_validation.json", validation)
+    write_json(output_dir / "provenance.json", provenance)
 
     major_confusions = confusion_pairs[:5]
     weakest = lowest_ap
@@ -689,11 +783,22 @@ def main() -> None:
         "- 数据：固定 `val.txt` 的 400 张图，未使用 prelim_test；",
         f"- GT：{validation['ground_truth_objects']} 个；低阈值预测：{validation['prediction_objects']} 个；",
         f"- CLEAN 校验：导出 GT 与本地 `labels_clean` 的 {validation['clean_label_images_checked']} 张、{validation['clean_label_objects_checked']} 个框逐项一致；",
-        f"- FP/FN 工作点：`confidence >= {OPERATING_CONF}`、`IoU >= {MATCH_IOU}`；",
+        "- provenance 详见 `e001_error_analysis/provenance.json`；无法由现有证据恢复的字段统一记为 `unavailable`；",
         "- size bin 使用 `imgsz=640` letterbox 参考面积：tiny < 256，small [256,1024)，medium [1024,9216)，large >= 9216；",
         "- 未修改 labels_clean、fixed split 或任何数据文件。",
         "",
-        "## 2. B1：Per-class Metrics",
+        "## 2. B1：两套指标与来源",
+        "",
+        "两套指标必须分开理解，本次 analysis export / re-validation 不覆盖 canonical historical training `results.csv`。",
+        "",
+        "| 指标来源 | Precision | Recall | mAP50 | mAP50-95 |",
+        "| --- | ---: | ---: | ---: | ---: |",
+        f"| E001 historical training `results.csv`（best epoch={historical_metrics['best_epoch']}） | {historical_metrics['precision']:.5f} | {historical_metrics['recall']:.5f} | {historical_metrics['mAP50']:.5f} | {historical_metrics['mAP50-95']:.5f} |",
+        f"| B analysis export / re-validation | {validation_metrics['precision']:.5f} | {validation_metrics['recall']:.5f} | {validation_metrics['mAP50']:.5f} | {validation_metrics['mAP50-95']:.5f} |",
+        "",
+        "Historical result 直接取 export 中 `results.csv` 的最高 mAP50-95 行；checkpoint 记录为 `runs/E001_RGB_YOLO11N_CLEAN/weights/best.pt`，但 export 未包含 checkpoint/hash。re-validation 的指标来自 `validation_metrics.json`，逐类指标来自 `per_class_metrics.csv`。其 validation/export 命令、imgsz、conf、iou、max_det、device 及 Python/torch/Ultralytics 版本均无法由现有 export 确认，记为 `unavailable`。`args.yaml` 是历史训练配置，不能当作独立 re-validation 命令证据。",
+        "",
+        "### Re-validation per-class metrics",
         "",
         "| class | GT | Precision | Recall | AP50 | AP50-95 |",
         "| --- | ---: | ---: | ---: | ---: | ---: |",
@@ -704,15 +809,28 @@ def main() -> None:
         "",
         "AP50-95 最低的类别为：" + "、".join(f"{row['class_name']} ({row['AP50-95']:.3f}, GT={int(row['GT_support'])})" for _, row in weakest.iterrows()) + "。",
         "",
-        "## 3. B2：Confusion、FP 与 FN",
+        "## 3. B2：Confusion 与内部 FP/FN 的不同口径",
         "",
-        f"在内部工作点共有 {len(fn_rows)} 个 FN，confidence >= {HIGH_CONF_FP} 的 FP 共 {len(high_fp)} 个。",
+        "### Imported confusion",
+        "",
+        "- 来源：analysis export 中的 `confusion_matrix.csv`；",
+        "- threshold：`unavailable`；matching 设置：`unavailable`；",
+        f"- diagonal TP = {imported_confusion_tp}；background-row misses = {imported_confusion_misses}。",
+        "",
+        "### Member B internal FP/FN matcher",
+        "",
+        f"- 实现：当前 `scripts/analysis/analyze_e001_errors.py`；prediction confidence >= {OPERATING_CONF}；matching IoU >= {MATCH_IOU}；",
+        f"- TP = {internal_tp}；FN = {len(fn_rows)}；",
+        f"- high-confidence FP 定义为 confidence >= {HIGH_CONF_FP}，count = {len(high_fp)}。",
+        "",
+        "**Imported confusion 与内部 matcher 不是同一个 evaluator / operating point 的可直接比较结果，不应把两组 TP/FN 数字写成等式或要求一致。**",
+        "",
         "主要非背景类别混淆：" + ("；".join(f"{row['true_class']} -> {row['predicted_class']} ({row['count']})" for row in major_confusions) if major_confusions else "未观察到明显类别间混淆") + "。",
         "完整证据见 `confusion_pairs.csv`、`high_confidence_fp.csv` 和 `representative_fn.csv`。",
         "",
         "## 4. B3：BBox-size Performance",
         "",
-        "以下是内部工作点统计，不等同于赛事官方 AP：",
+        "尺寸定义固定为 `imgsz=640` 的 letterbox 参考像素面积：tiny < 256 px²、small [256,1024) px²、medium [1024,9216) px²、large >= 9216 px²。以下是自定义内部工作点统计，不是标准 COCO size AP/Precision：TP/FN 按 GT size 归档，FP 按 prediction size 归档，因此表中 Precision 只用于内部诊断。",
         "",
         "| size | GT | TP | FN | FP(pred-size) | Precision | Recall |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
@@ -723,25 +841,25 @@ def main() -> None:
         "",
         "## 5. B4：Hard Cases",
         "",
-        "已按 tiny、遮挡代理、低照度、低对比度、密集场景、相似类别和边界目标各筛选最多 3 个候选，并生成 GT/预测叠加图。遮挡代理基于 GT 框重叠，必须由人复核。清单见 `hard_cases.csv`，图片见 `hard_cases/`。",
+        f"`hard_cases.csv` 是定向错误案例清单，不代表固定 val 的总体分布。每类最多选择 3 个候选；派生 JPG 仅在本地按需生成且不纳入 Git。occlusion 只是 GT overlap proxy，不报告或声称正式 occlusion Recall。low-light 仅定义为 Visible 灰度均值 P10 候选子集（{low_light_subset_count} 张），目前没有正式 low-light Recall。",
         "",
         "## 6. B5：Data-performance Relation",
         "",
-        f"类别 GT 数量与 AP50-95 的 Spearman 相关系数为 {correlations['spearman_support_vs_ap50_95']:.3f}；log10(GT) 与 AP50-95 的 Pearson 相关系数为 {correlations['pearson_log_support_vs_ap50_95']:.3f}。仅报告探索性相关，不解释为因果。",
+        f"类别在固定 val 中的 GT support 与 AP50-95 的 Spearman 相关系数为 {correlations['spearman_support_vs_ap50_95']:.3f}；log10(val GT support) 与 AP50-95 的 Pearson 相关系数为 {correlations['pearson_log_support_vs_ap50_95']:.3f}。这里的 frequency 仅指 val GT support，不是 training frequency；仅报告探索性相关，不解释为因果。",
         "",
         "## 7. B6：Multimodal Hypotheses",
         "",
         "1. 主要瓶颈是整体 Recall 明显低于 Precision、极低频类别不稳定、tiny/small 目标漏检、背景方向漏检多，以及 AP50 到 AP50-95 的定位性能下降。",
-        "2. 低照度和低对比度候选中的漏检可能与 RGB 信息不足有关，应结合叠加图人工确认。",
-        "3. E002 IR 优先验证低照度、低对比度下的 person、animal 和其他高 FN 类别；若白天正常场景也同样漏检，则不能归因于 RGB 光照不足。",
-        "4. E003 Depth 优先验证拥挤、遮挡和前后景重叠样本；边界截断和 tiny 目标不应预设可由 Depth 自动解决。",
+        "2. 假设：Visible-defined 低照度和低对比度候选中的漏检可能与 RGB 信息不足有关，尚未证明。",
+        "3. E002 IR 假设：优先验证低照度、低对比度下的 person、animal 和其他高 FN 类别；若白天正常场景也同样漏检，则不能归因于 RGB 光照不足。",
+        "4. E003 Depth 假设：优先验证拥挤、GT-overlap proxy 和前后景重叠样本；边界截断和 tiny 目标不应预设可由 Depth 自动解决。",
         "5. 重点观察低 AP/低 Recall 类别，以及 `hard_cases.csv` 中同时出现 FN 和高置信度 FP 的样本。",
-        "6. Fusion 首先做针对低照度与遮挡子集的可证伪比较；若单模态 IR/Depth 未改善对应子集，不应直接增加 Fusion 复杂度。",
+        "6. Fusion 假设：首先做针对 Visible-defined low-light 与 GT-overlap proxy 子集的可证伪比较；若单模态 IR/Depth 未改善对应子集，不应直接增加 Fusion 复杂度。",
         "",
         "## 8. 限制",
         "",
-        "- size 性能是固定工作点内部统计，不是官方榜单指标；",
-        "- hard-case 场景标签由图像统计和框几何筛选，仍需人工复核；",
+        "- size Precision/Recall 是自定义固定工作点内部统计，不是标准 COCO size 指标或官方榜单指标；",
+        "- hard cases 是定向错误候选，不代表总体分布；场景标签由图像统计和框几何筛选，仍需人工复核；",
         "- 12 类相关分析样本量小，只能形成假设；",
         "- 本报告没有使用 prelim_test，也没有启动新训练。",
         "",
