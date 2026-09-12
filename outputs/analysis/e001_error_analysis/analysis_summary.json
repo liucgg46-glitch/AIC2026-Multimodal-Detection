@@ -1,0 +1,178 @@
+{
+  "analysis_scope": "E001_RGB_YOLO11N_CLEAN fixed val only",
+  "source_export_name": "E001_CLEAN_ERROR_ANALYSIS_EXPORT",
+  "validation": {
+    "val_images": 400,
+    "ground_truth_objects": 3041,
+    "prediction_objects": 38885,
+    "minimum_export_confidence": 0.0010001,
+    "fixed_val_match": true,
+    "source_files": {
+      "args.yaml": "08ffa49c1e5db5f426b38be32b7ba6dda0c6aee4806bcd1bcc7a556073e8341e",
+      "results.csv": "4a37c741fd45a203f6d356dad8c5719e5909c9d1792c3cec550b28401102c9b0",
+      "per_class_metrics.csv": "558a0822d6107f7aa21f1d7e522132fa0037d76e3542dcdce24f149ce90b47a1",
+      "confusion_matrix.csv": "19d3e9789c7a0eb1959e2d65414fa813a48d808e6aac279c8e057dc7ae1a8787",
+      "confusion_matrix.png": "75d06ef89bf19560128b171ccb5a7a3ede6c49c9ea1f2814c4d6a530d4802b35",
+      "confusion_matrix_normalized.png": "34e2a478535fe24c9908926bd5ee4853f89d789e399d28d50fbddfcab6fe24cb",
+      "validation_metrics.json": "ff9c6c837263848b6ae534be42664280fad9255e4f89f8b498a7fb84f746f6b0",
+      "val_predictions.json": "69a3199c5067d992272edf306db71b3f58c4a9a862b4dc27054268c48fb72d54",
+      "val_ground_truth.json": "8095e603786a0719275c7d0ea0a029eaf49627505b68d66d7523e00a339843e1"
+    },
+    "clean_label_match": true,
+    "clean_label_images_checked": 400,
+    "clean_label_objects_checked": 3041
+  },
+  "operating_point": {
+    "confidence": 0.25,
+    "iou": 0.5
+  },
+  "historical_training_metrics": {
+    "source": "E001 historical training results.csv; row with maximum mAP50-95",
+    "best_epoch": 78,
+    "precision": 0.81605,
+    "recall": 0.5582,
+    "mAP50": 0.61119,
+    "mAP50-95": 0.37346
+  },
+  "analysis_export_revalidation_metrics": {
+    "precision": 0.8172495551108875,
+    "recall": 0.5593378970958152,
+    "mAP50": 0.6114362820797138,
+    "mAP50-95": 0.37328908967812097,
+    "val_images": 400
+  },
+  "imported_confusion": {
+    "source": "confusion_matrix.csv in E001_CLEAN_ERROR_ANALYSIS_EXPORT",
+    "threshold": "unavailable",
+    "matching_settings": "unavailable",
+    "diagonal_TP": 2086,
+    "background_row_misses": 920,
+    "comparability_note": "Not the same evaluator/operating point as the member B internal matcher; do not equate the counts."
+  },
+  "internal_matcher_TP": 2040,
+  "false_negatives_at_operating_point": 1001,
+  "high_confidence_false_positives": 223,
+  "high_confidence_fp_reasons": {
+    "localization": 115,
+    "background": 63,
+    "class_confusion": 17,
+    "duplicate_detection": 28
+  },
+  "top_fn_classes": [
+    {
+      "class_id": 0,
+      "class_name": "person",
+      "count": 421
+    },
+    {
+      "class_id": 2,
+      "class_name": "animal",
+      "count": 201
+    },
+    {
+      "class_id": 8,
+      "class_name": "light",
+      "count": 75
+    },
+    {
+      "class_id": 4,
+      "class_name": "sign",
+      "count": 72
+    },
+    {
+      "class_id": 5,
+      "class_name": "bicycle",
+      "count": 61
+    }
+  ],
+  "lowest_ap50_95_classes": [
+    {
+      "class_id": 11,
+      "class_name": "tricycle",
+      "AP50-95": 0.159021805610956,
+      "GT_support": 5
+    },
+    {
+      "class_id": 5,
+      "class_name": "bicycle",
+      "AP50-95": 0.2602068111955085,
+      "GT_support": 134
+    },
+    {
+      "class_id": 1,
+      "class_name": "boat",
+      "AP50-95": 0.3161646970533666,
+      "GT_support": 26
+    },
+    {
+      "class_id": 9,
+      "class_name": "garbage can",
+      "AP50-95": 0.3212403480451556,
+      "GT_support": 57
+    },
+    {
+      "class_id": 7,
+      "class_name": "ball",
+      "AP50-95": 0.3600583270101546,
+      "GT_support": 19
+    }
+  ],
+  "size_performance": [
+    {
+      "size_bin": "tiny",
+      "GT_support": 757,
+      "TP": 261,
+      "FN": 496,
+      "FP_by_prediction_size": 290,
+      "precision_at_conf_0_25_iou_0_50": 0.47368421052631576,
+      "recall_at_conf_0_25_iou_0_50": 0.34478203434610305,
+      "mean_matched_iou": 0.6875815764979655
+    },
+    {
+      "size_bin": "small",
+      "GT_support": 1066,
+      "TP": 730,
+      "FN": 336,
+      "FP_by_prediction_size": 359,
+      "precision_at_conf_0_25_iou_0_50": 0.6703397612488522,
+      "recall_at_conf_0_25_iou_0_50": 0.6848030018761726,
+      "mean_matched_iou": 0.7583814491249219
+    },
+    {
+      "size_bin": "medium",
+      "GT_support": 980,
+      "TP": 840,
+      "FN": 140,
+      "FP_by_prediction_size": 215,
+      "precision_at_conf_0_25_iou_0_50": 0.7962085308056872,
+      "recall_at_conf_0_25_iou_0_50": 0.8571428571428571,
+      "mean_matched_iou": 0.8192527947205084
+    },
+    {
+      "size_bin": "large",
+      "GT_support": 238,
+      "TP": 209,
+      "FN": 29,
+      "FP_by_prediction_size": 38,
+      "precision_at_conf_0_25_iou_0_50": 0.8461538461538461,
+      "recall_at_conf_0_25_iou_0_50": 0.8781512605042017,
+      "mean_matched_iou": 0.8870819417429597
+    }
+  ],
+  "correlations": {
+    "pearson_log_support_vs_ap50_95": 0.4957647273993055,
+    "spearman_support_vs_ap50_95": 0.4125874125874127,
+    "size_order_vs_recall_spearman": 1.0
+  },
+  "hard_case_thresholds": {
+    "low_light_luminance_p10": 99.18934201388889,
+    "visible_defined_low_light_candidate_images": 40,
+    "low_contrast_std_p10": 35.84051431389738
+  },
+  "limitations": [
+    "Per-class AP is copied from the canonical Ultralytics validation export.",
+    "Size-binned precision/recall is an internal operating-point analysis, not official competition AP.",
+    "Occlusion is selected by GT-overlap proxy and requires human confirmation.",
+    "Correlations are exploratory and do not establish causality."
+  ]
+}
