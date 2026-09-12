@@ -1,0 +1,15 @@
+﻿true_class,predicted_class,count
+seat,person,6
+bicycle,person,5
+boat,person,4
+bicycle,car,3
+person,animal,3
+person,bicycle,3
+car,bicycle,2
+sign,light,2
+tricycle,car,2
+bicycle,garbage can,1
+boat,animal,1
+light,sign,1
+seat,bicycle,1
+sign,garbage can,1

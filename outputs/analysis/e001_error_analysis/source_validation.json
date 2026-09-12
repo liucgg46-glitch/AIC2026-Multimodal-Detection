@@ -1,0 +1,21 @@
+{
+  "val_images": 400,
+  "ground_truth_objects": 3041,
+  "prediction_objects": 38885,
+  "minimum_export_confidence": 0.0010001,
+  "fixed_val_match": true,
+  "source_files": {
+    "args.yaml": "08ffa49c1e5db5f426b38be32b7ba6dda0c6aee4806bcd1bcc7a556073e8341e",
+    "results.csv": "4a37c741fd45a203f6d356dad8c5719e5909c9d1792c3cec550b28401102c9b0",
+    "per_class_metrics.csv": "558a0822d6107f7aa21f1d7e522132fa0037d76e3542dcdce24f149ce90b47a1",
+    "confusion_matrix.csv": "19d3e9789c7a0eb1959e2d65414fa813a48d808e6aac279c8e057dc7ae1a8787",
+    "confusion_matrix.png": "75d06ef89bf19560128b171ccb5a7a3ede6c49c9ea1f2814c4d6a530d4802b35",
+    "confusion_matrix_normalized.png": "34e2a478535fe24c9908926bd5ee4853f89d789e399d28d50fbddfcab6fe24cb",
+    "validation_metrics.json": "ff9c6c837263848b6ae534be42664280fad9255e4f89f8b498a7fb84f746f6b0",
+    "val_predictions.json": "69a3199c5067d992272edf306db71b3f58c4a9a862b4dc27054268c48fb72d54",
+    "val_ground_truth.json": "8095e603786a0719275c7d0ea0a029eaf49627505b68d66d7523e00a339843e1"
+  },
+  "clean_label_match": true,
+  "clean_label_images_checked": 400,
+  "clean_label_objects_checked": 3041
+}
