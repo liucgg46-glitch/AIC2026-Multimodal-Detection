@@ -149,6 +149,33 @@ def test_jpg_and_labels_are_byte_preserving_isolated_copies(canonical_project: D
         assert not os.path.samefile(source, staged)
 
 
+@pytest.mark.parametrize(
+    ("source_name", "staged_name"),
+    [("train_png.PNG", "train_png.png"), ("train_jpg.JPG", "train_jpg.jpg")],
+)
+def test_uppercase_source_extension_uses_one_canonical_staged_name(
+    canonical_project: Dict[str, Path], source_name: str, staged_name: str
+) -> None:
+    stem = Path(source_name).stem
+    original = next(canonical_project["depth_dir"].glob(f"{stem}.*"))
+    temporary = original.with_name(f"{stem}.temporary")
+    original.rename(temporary)
+    source = original.with_name(source_name)
+    temporary.rename(source)
+    source_bytes = source.read_bytes()
+    result = build_canonical(canonical_project)
+    staged = canonical_project["output"] / "images/train" / staged_name
+    assert staged.is_file() and staged.name == staged_name
+    record = next(
+        item for item in result["manifest"]["source_file_list"] if item["stem"] == stem
+    )
+    assert record["staged_image_view_relative"].endswith(staged_name)
+    assert record["output_bytes"] == staged.stat().st_size
+    assert record["output_sha256"] == MODULE.sha256_file(staged)
+    if source.suffix.lower() in {".jpg", ".jpeg"}:
+        assert staged.read_bytes() == source_bytes
+
+
 def test_every_output_is_uint8_three_channel_and_finite(canonical_project: Dict[str, Path]) -> None:
     build_canonical(canonical_project)
     for path in (canonical_project["output"] / "images").rglob("*.*"):

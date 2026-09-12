@@ -233,6 +233,28 @@ def test_inverse_frozen_boundaries_midpoint_and_monotonicity() -> None:
     assert np.array_equal(depth, before)
 
 
+def test_inverse_actual_writer_accepts_far_values_and_preserves_contract(
+    tmp_path: Path,
+) -> None:
+    increasing = np.array(
+        [0, 1, 299, 300, 301, 1000, 5000, 10000, 19999, 20000, 65535],
+        dtype=np.uint16,
+    )
+    source = write_png(tmp_path / "source.png", increasing.reshape(1, -1))
+    destination = tmp_path / "output.png"
+    MODULE.write_candidate_png(source, destination, "inverse", None)
+    decoded = cv2.imread(str(destination), cv2.IMREAD_UNCHANGED)
+    assert decoded is not None and decoded.dtype == np.uint8
+    assert decoded.shape == (1, increasing.size, 3)
+    assert np.array_equal(decoded[..., 0], decoded[..., 1])
+    assert np.array_equal(decoded[..., 1], decoded[..., 2])
+    gray = decoded[0, :, 0]
+    assert np.array_equal(gray[[0, 3, 9, 10]], [0, 255, 1, 1])
+    valid = increasing > 0
+    assert np.all(gray[valid] >= 1) and np.all(gray[~valid] == 0)
+    assert np.all(np.diff(gray[1:].astype(np.int16)) <= 0)
+
+
 @pytest.mark.parametrize("candidate", MODULE.SUPPORTED_CANDIDATES)
 def test_all_candidate_builds_have_exact_images_labels_and_manifest(
     canonical_project: Dict[str, Path], candidate: str

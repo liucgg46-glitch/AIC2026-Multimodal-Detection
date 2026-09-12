@@ -535,6 +535,14 @@ def copy_isolated(source: Path, destination: Path) -> None:
     shutil.copy2(source, destination)
 
 
+def staged_image_name(source: Path) -> str:
+    """Return the single canonical staged name with a lowercase extension."""
+    suffix = source.suffix.lower()
+    if suffix not in DEPTH_IMAGE_EXTENSIONS:
+        raise DepthDatasetViewError(f"不支持的 Depth 扩展名: {source.name}")
+    return f"{source.stem}{suffix}"
+
+
 def convert_png_compat8(source: Path, destination: Path) -> None:
     """Apply the fixed C2 bit-depth compatibility conversion and lossless encoding."""
     depth = cv2.imread(str(source), cv2.IMREAD_UNCHANGED)
@@ -570,7 +578,7 @@ def build_source_records(validation: Dict[str, Any], staging: Path) -> List[Dict
         subset = subset_by_stem[stem]
         image = validation["images"][stem]
         label = validation["labels"][stem]
-        staged_image_relative = Path("images") / subset / image.name
+        staged_image_relative = Path("images") / subset / staged_image_name(image)
         staged_label_relative = Path("labels") / subset / f"{stem}.txt"
         staged_image = staging / staged_image_relative
         staged_label = staging / staged_label_relative
@@ -768,7 +776,7 @@ def build_view(
             image_out.mkdir(parents=True)
             label_out.mkdir(parents=True)
             for stem, image, label in validation["entries"][subset]:
-                destination = image_out / f"{stem}{image.suffix.lower()}"
+                destination = image_out / staged_image_name(image)
                 if image.suffix.lower() == ".png":
                     convert_png_compat8(image, destination)
                     methods["png_compat8_conversion"] += 1

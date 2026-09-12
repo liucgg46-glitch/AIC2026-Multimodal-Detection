@@ -300,7 +300,7 @@ def write_candidate_png(
     depth = cv2.imread(str(source), cv2.IMREAD_UNCHANGED)
     if depth is None or depth.dtype != np.uint16 or depth.ndim != 2:
         raise DepthCandidateViewError(f"PNG 必须是 IMREAD_UNCHANGED uint16 2D: {source}")
-    if int(depth.max()) > D_FAR_MM:
+    if candidate == "log" and int(depth.max()) > D_FAR_MM:
         raise DepthCandidateViewError(
             f"canonical PNG max 超过 {D_FAR_MM} mm: {source.name}"
         )
