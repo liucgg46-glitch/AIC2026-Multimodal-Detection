@@ -46,12 +46,12 @@ Leaderboard score：`PENDING`
 
 ### 成员 B：E001 CLEAN Error Analysis
 
-- [ ] 整理固定 val 上的 per-class metrics
-- [ ] 完成 confusion、FP、FN 分析
-- [ ] 沿用既定 tiny/small/medium/large size bin 分析性能
-- [ ] 整理代表性 hard cases
-- [ ] 分析数据属性与性能的 correlation / hypothesis
-- [ ] 提炼 E002/E003 和后续 Fusion 的验证重点
+- [x] 整理固定 val 上的 per-class metrics
+- [x] 完成 confusion、FP、FN 分析
+- [x] 沿用既定 tiny/small/medium/large size bin 分析性能
+- [x] 整理代表性 hard cases
+- [x] 分析数据属性与性能的 correlation / hypothesis
+- [x] 提炼 E002/E003 和后续 Fusion 的验证重点
 
 详细边界见 `docs/CODEX_B_PHASE2_ERROR_ANALYSIS.md`。
 
@@ -82,7 +82,7 @@ B 的 E001 CLEAN error analysis 可与 C 并行
 
 以下事项全部完成后才允许进入 Fusion：
 
-1. [ ] E001 CLEAN error analysis
+1. [x] E001 CLEAN error analysis
 2. [ ] IR preprocessing review
 3. [ ] Depth preprocessing review
 4. [ ] E002 IR-only

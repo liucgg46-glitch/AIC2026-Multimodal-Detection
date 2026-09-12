@@ -218,6 +218,9 @@ outputs/visualization/**
 !outputs/visualization/**/
 !outputs/visualization/**/.gitkeep
 
+# Locally regenerated E001 hard-case previews (keep CSV stem manifest in Git)
+outputs/analysis/e001_error_analysis/hard_cases/*.jpg
+
 # Keep these under version control:
 # - data/splits/
 # - outputs/analysis/ (small CSV / JSON / Markdown summaries)
