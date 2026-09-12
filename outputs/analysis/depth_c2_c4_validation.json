@@ -1,181 +1,471 @@
 {
-  "schema_version": 1,
-  "git_commit_sha": "0cacdc25c42120ee80d6fd5c949a87fcbb5e7bf8",
-  "python_version": "3.10.21",
-  "pytorch_version": "2.14.0+cpu",
-  "ultralytics_version": "8.4.146",
-  "source_contract": {
-    "depth_dir": "data/raw/train/depth",
-    "label_dir": "data/processed/train/labels_clean",
-    "train_split": "data/splits/train.txt",
-    "val_split": "data/splits/val.txt",
-    "train_split_normalized_sha256": "20b0c1fb09a6848a4700a5adc8ce1f9a6d9040a48626a1759020d7f986450969",
-    "val_split_normalized_sha256": "336165b3509b6a0516b052c02fd98d152441300e8ae757eb0d27ca68a053ee48",
-    "labels_clean_identity": {
-      "aggregate_sha256": "6a670b95b33e803e5d25fc30d7bbd7985cbc4799234c37ff42b3b1c9204025a4",
-      "file_count": 2000,
-      "total_bytes": 587886
-    }
-  },
-  "loader_smoke_contract": {
-    "implementation": "Ultralytics build_yolo_dataset and build_dataloader",
-    "batch_size": 2,
-    "image_shape": [2, 3, 640, 640],
-    "image_tensor_dtype": "torch.uint8",
-    "normalized_tensor_finite": true,
-    "normalized_tensor_range": [0.0, 1.0],
-    "class_tensor_finite": true,
-    "bbox_tensor_finite": true,
-    "missing_images": 0,
-    "missing_labels": 0
-  },
   "candidates": [
     {
       "candidate": "validmask",
-      "representation_definition": "PNG uint16: depth_mm > 0 maps to 255 and invalid 0 maps to 0, then repeat grayscale to three channels; JPG is byte-preserving passthrough",
+      "decode_failure_count": 0,
+      "decoded_image_count": 2000,
+      "duplicate_count": 0,
+      "duplicate_image_count": 0,
+      "duplicate_label_count": 0,
+      "extra_image_count": 0,
+      "extra_label_count": 0,
+      "jpg_policy": {
+        "conversion": "byte_preserving_passthrough",
+        "output_channels": 3,
+        "output_dtype": "uint8",
+        "physical_unit": "unknown"
+      },
       "manifest_path": "data/processed/depth_trainable/validmask/manifest.json",
       "manifest_sha256": "6d32c380bccfeb9656d2b7dc9db83e6c140dd09dae82b7a5a332da890a4d4a4e",
-      "train_split_normalized_sha256": "20b0c1fb09a6848a4700a5adc8ce1f9a6d9040a48626a1759020d7f986450969",
-      "val_split_normalized_sha256": "336165b3509b6a0516b052c02fd98d152441300e8ae757eb0d27ca68a053ee48",
-      "labels_clean_identity": "6a670b95b33e803e5d25fc30d7bbd7985cbc4799234c37ff42b3b1c9204025a4",
+      "missing_count": 0,
+      "missing_image_count": 0,
+      "missing_label_count": 0,
+      "observed_channels": [
+        3
+      ],
+      "observed_dtypes": [
+        "uint8"
+      ],
+      "representation": "validmask",
+      "representation_definition": {
+        "channel_mapping": "repeat_gray_x3",
+        "formula": "depth_mm > 0",
+        "input_dtype": "uint16",
+        "input_unit": "mm",
+        "invalid_value": 0,
+        "output_channels": 3,
+        "output_dtype": "uint8",
+        "representation": "validmask",
+        "valid_rule": "depth_mm > 0",
+        "valid_value": 255
+      },
       "total": 2000,
       "train": 1600,
-      "val": 400,
-      "png": 1851,
-      "jpg": 149,
-      "train_png": 1478,
-      "train_jpg": 122,
-      "val_png": 373,
-      "val_jpg": 27,
-      "missing_count": 0,
-      "duplicate_count": 0,
+      "train_label_count": 1600,
+      "train_loader_smoke": {
+        "actual_sample_count": 2,
+        "batch_obtained": true,
+        "bbox_tensor_present": true,
+        "bbox_tensor_shape": [
+          41,
+          4
+        ],
+        "bboxes_read": true,
+        "class_tensor_present": true,
+        "class_tensor_shape": [
+          41,
+          1
+        ],
+        "classes_read": true,
+        "configured_batch_size": 2,
+        "dataset_size": 1600,
+        "finite": true,
+        "image_dtype": "torch.uint8",
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocessing_stage": "Ultralytics dataset/dataloader output before trainer normalization"
+      },
       "train_val_overlap_count": 0,
-      "decoded_count": 2000,
-      "output_dtype": "uint8",
-      "channels": 3,
-      "png_channel_mismatch_count": 0,
-      "spatial_mismatch_count": 0,
-      "label_byte_mismatch_count": 0,
-      "jpg_policy": "byte_preserving_passthrough; physical unit unknown",
-      "jpg_byte_mismatch_count": 0,
-      "train_loader_smoke": {"passed": true, "dataset_count": 1600},
-      "val_loader_smoke": {"passed": true, "dataset_count": 400}
+      "val": 400,
+      "val_label_count": 400,
+      "val_loader_smoke": {
+        "actual_sample_count": 2,
+        "batch_obtained": true,
+        "bbox_tensor_present": true,
+        "bbox_tensor_shape": [
+          17,
+          4
+        ],
+        "bboxes_read": true,
+        "class_tensor_present": true,
+        "class_tensor_shape": [
+          17,
+          1
+        ],
+        "classes_read": true,
+        "configured_batch_size": 2,
+        "dataset_size": 400,
+        "finite": true,
+        "image_dtype": "torch.uint8",
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocessing_stage": "Ultralytics dataset/dataloader output before trainer normalization"
+      }
     },
     {
       "candidate": "percentile",
-      "representation_definition": "PNG uint16: fixed C3 train-PNG P2/P98 clip and normalize to uint8, then repeat grayscale to three channels; JPG is byte-preserving passthrough",
+      "decode_failure_count": 0,
+      "decoded_image_count": 2000,
+      "duplicate_count": 0,
+      "duplicate_image_count": 0,
+      "duplicate_label_count": 0,
+      "extra_image_count": 0,
+      "extra_label_count": 0,
+      "jpg_policy": {
+        "conversion": "byte_preserving_passthrough",
+        "output_channels": 3,
+        "output_dtype": "uint8",
+        "physical_unit": "unknown"
+      },
       "manifest_path": "data/processed/depth_trainable/percentile/manifest.json",
       "manifest_sha256": "a4bf7983dbffbe0527451e321c03f1133e3615d6c88a08ac0217eb49413e6cc2",
-      "train_split_normalized_sha256": "20b0c1fb09a6848a4700a5adc8ce1f9a6d9040a48626a1759020d7f986450969",
-      "val_split_normalized_sha256": "336165b3509b6a0516b052c02fd98d152441300e8ae757eb0d27ca68a053ee48",
-      "labels_clean_identity": "6a670b95b33e803e5d25fc30d7bbd7985cbc4799234c37ff42b3b1c9204025a4",
+      "missing_count": 0,
+      "missing_image_count": 0,
+      "missing_label_count": 0,
+      "observed_channels": [
+        3
+      ],
+      "observed_dtypes": [
+        "uint8"
+      ],
+      "representation": "percentile",
+      "representation_definition": {
+        "c3_parameter_identity_sha256": "aab4008fb51154016d7703de6af186e39267c322b71e93e791aa28e1b646f6ab",
+        "channel_mapping": "repeat_gray_x3",
+        "fit_scope": "train_png_only",
+        "float_range": [
+          0.0,
+          1.0
+        ],
+        "formula": "C3 P2/P98 clip and normalize",
+        "high_mm": 18819,
+        "input_dtype": "uint16",
+        "input_unit": "mm",
+        "invalid_value": 0,
+        "jpg_used_for_fit": false,
+        "low_mm": 1638,
+        "output_channels": 3,
+        "output_dtype": "uint8",
+        "p_high": 98,
+        "p_low": 2,
+        "quantization": "floor(clip(x,0,1)*255)",
+        "representation": "percentile",
+        "val_used_for_fit": false,
+        "valid_rule": "depth_mm > 0",
+        "zero_excluded": true
+      },
       "total": 2000,
       "train": 1600,
-      "val": 400,
-      "png": 1851,
-      "jpg": 149,
-      "train_png": 1478,
-      "train_jpg": 122,
-      "val_png": 373,
-      "val_jpg": 27,
-      "missing_count": 0,
-      "duplicate_count": 0,
+      "train_label_count": 1600,
+      "train_loader_smoke": {
+        "actual_sample_count": 2,
+        "batch_obtained": true,
+        "bbox_tensor_present": true,
+        "bbox_tensor_shape": [
+          41,
+          4
+        ],
+        "bboxes_read": true,
+        "class_tensor_present": true,
+        "class_tensor_shape": [
+          41,
+          1
+        ],
+        "classes_read": true,
+        "configured_batch_size": 2,
+        "dataset_size": 1600,
+        "finite": true,
+        "image_dtype": "torch.uint8",
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocessing_stage": "Ultralytics dataset/dataloader output before trainer normalization"
+      },
       "train_val_overlap_count": 0,
-      "decoded_count": 2000,
-      "output_dtype": "uint8",
-      "channels": 3,
-      "png_channel_mismatch_count": 0,
-      "spatial_mismatch_count": 0,
-      "label_byte_mismatch_count": 0,
-      "jpg_policy": "byte_preserving_passthrough; physical unit unknown",
-      "jpg_byte_mismatch_count": 0,
-      "train_loader_smoke": {"passed": true, "dataset_count": 1600},
-      "val_loader_smoke": {"passed": true, "dataset_count": 400},
-      "fit_scope": "train_png_only",
-      "zero_excluded": true,
-      "p_low": 2,
-      "p_high": 98,
-      "low_mm": 1638,
-      "high_mm": 18819,
-      "c3_percentile_parameter_sha256": "aab4008fb51154016d7703de6af186e39267c322b71e93e791aa28e1b646f6ab",
-      "val_participated_in_fit": false,
-      "jpg_participated_in_fit": false
+      "val": 400,
+      "val_label_count": 400,
+      "val_loader_smoke": {
+        "actual_sample_count": 2,
+        "batch_obtained": true,
+        "bbox_tensor_present": true,
+        "bbox_tensor_shape": [
+          17,
+          4
+        ],
+        "bboxes_read": true,
+        "class_tensor_present": true,
+        "class_tensor_shape": [
+          17,
+          1
+        ],
+        "classes_read": true,
+        "configured_batch_size": 2,
+        "dataset_size": 400,
+        "finite": true,
+        "image_dtype": "torch.uint8",
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocessing_stage": "Ultralytics dataset/dataloader output before trainer normalization"
+      }
     },
     {
       "candidate": "log",
-      "representation_definition": "PNG uint16: fixed log1p mapping over canonical 1..19999 mm to uint8, invalid 0 remains 0, then repeat grayscale to three channels; JPG is byte-preserving passthrough",
+      "decode_failure_count": 0,
+      "decoded_image_count": 2000,
+      "duplicate_count": 0,
+      "duplicate_image_count": 0,
+      "duplicate_label_count": 0,
+      "extra_image_count": 0,
+      "extra_label_count": 0,
+      "jpg_policy": {
+        "conversion": "byte_preserving_passthrough",
+        "output_channels": 3,
+        "output_dtype": "uint8",
+        "physical_unit": "unknown"
+      },
       "manifest_path": "data/processed/depth_trainable/log/manifest.json",
       "manifest_sha256": "3990882def4c2f21c1deb7cb4cba8dd92d6bd41c518b945cce32b82fa59ff215",
-      "train_split_normalized_sha256": "20b0c1fb09a6848a4700a5adc8ce1f9a6d9040a48626a1759020d7f986450969",
-      "val_split_normalized_sha256": "336165b3509b6a0516b052c02fd98d152441300e8ae757eb0d27ca68a053ee48",
-      "labels_clean_identity": "6a670b95b33e803e5d25fc30d7bbd7985cbc4799234c37ff42b3b1c9204025a4",
+      "missing_count": 0,
+      "missing_image_count": 0,
+      "missing_label_count": 0,
+      "observed_channels": [
+        3
+      ],
+      "observed_dtypes": [
+        "uint8"
+      ],
+      "representation": "log",
+      "representation_definition": {
+        "channel_mapping": "repeat_gray_x3",
+        "formula": "log1p(depth_mm)",
+        "input_dtype": "uint16",
+        "input_unit": "mm",
+        "invalid_value": 0,
+        "mapping_max": 9.903487205505371,
+        "mapping_min": 0.6931471824645996,
+        "model_range_max_mm": 19999,
+        "model_range_min_mm": 1,
+        "output_channels": 3,
+        "output_dtype": "uint8",
+        "quantization": "floor(clip((log-L_MIN)/(L_MAX-L_MIN),0,1)*255)",
+        "representation": "log",
+        "valid_rule": "depth_mm > 0"
+      },
       "total": 2000,
       "train": 1600,
-      "val": 400,
-      "png": 1851,
-      "jpg": 149,
-      "train_png": 1478,
-      "train_jpg": 122,
-      "val_png": 373,
-      "val_jpg": 27,
-      "missing_count": 0,
-      "duplicate_count": 0,
+      "train_label_count": 1600,
+      "train_loader_smoke": {
+        "actual_sample_count": 2,
+        "batch_obtained": true,
+        "bbox_tensor_present": true,
+        "bbox_tensor_shape": [
+          41,
+          4
+        ],
+        "bboxes_read": true,
+        "class_tensor_present": true,
+        "class_tensor_shape": [
+          41,
+          1
+        ],
+        "classes_read": true,
+        "configured_batch_size": 2,
+        "dataset_size": 1600,
+        "finite": true,
+        "image_dtype": "torch.uint8",
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocessing_stage": "Ultralytics dataset/dataloader output before trainer normalization"
+      },
       "train_val_overlap_count": 0,
-      "decoded_count": 2000,
-      "output_dtype": "uint8",
-      "channels": 3,
-      "png_channel_mismatch_count": 0,
-      "spatial_mismatch_count": 0,
-      "label_byte_mismatch_count": 0,
-      "jpg_policy": "byte_preserving_passthrough; physical unit unknown",
-      "jpg_byte_mismatch_count": 0,
-      "train_loader_smoke": {"passed": true, "dataset_count": 1600},
-      "val_loader_smoke": {"passed": true, "dataset_count": 400}
+      "val": 400,
+      "val_label_count": 400,
+      "val_loader_smoke": {
+        "actual_sample_count": 2,
+        "batch_obtained": true,
+        "bbox_tensor_present": true,
+        "bbox_tensor_shape": [
+          17,
+          4
+        ],
+        "bboxes_read": true,
+        "class_tensor_present": true,
+        "class_tensor_shape": [
+          17,
+          1
+        ],
+        "classes_read": true,
+        "configured_batch_size": 2,
+        "dataset_size": 400,
+        "finite": true,
+        "image_dtype": "torch.uint8",
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocessing_stage": "Ultralytics dataset/dataloader output before trainer normalization"
+      }
     },
     {
       "candidate": "inverse",
-      "representation_definition": "PNG uint16: valid depth is clipped to 300..19999 mm, reciprocal depth maps 1/19999 to 1 and 1/300 to 255 with floor(x+0.5), invalid 0 remains 0, then repeat grayscale to three channels; JPG is byte-preserving passthrough",
+      "decode_failure_count": 0,
+      "decoded_image_count": 2000,
+      "duplicate_count": 0,
+      "duplicate_image_count": 0,
+      "duplicate_label_count": 0,
+      "extra_image_count": 0,
+      "extra_label_count": 0,
+      "jpg_policy": {
+        "conversion": "byte_preserving_passthrough",
+        "output_channels": 3,
+        "output_dtype": "uint8",
+        "physical_unit": "unknown"
+      },
       "manifest_path": "data/processed/depth_trainable/inverse/manifest.json",
       "manifest_sha256": "328f9cfc2d3a0861038d4c5af521a86700e2a538dc01f87283916568d3123e09",
-      "train_split_normalized_sha256": "20b0c1fb09a6848a4700a5adc8ce1f9a6d9040a48626a1759020d7f986450969",
-      "val_split_normalized_sha256": "336165b3509b6a0516b052c02fd98d152441300e8ae757eb0d27ca68a053ee48",
-      "labels_clean_identity": "6a670b95b33e803e5d25fc30d7bbd7985cbc4799234c37ff42b3b1c9204025a4",
+      "missing_count": 0,
+      "missing_image_count": 0,
+      "missing_label_count": 0,
+      "observed_channels": [
+        3
+      ],
+      "observed_dtypes": [
+        "uint8"
+      ],
+      "representation": "inverse",
+      "representation_definition": {
+        "channel_mapping": "repeat_gray_x3",
+        "custom_loader": false,
+        "far_clip_mm": 19999,
+        "formula": "reciprocal_depth_fixed_near_far_mapping",
+        "input_dtype": "uint16",
+        "input_unit": "mm",
+        "invalid_value": 0,
+        "log_used": false,
+        "near_clip_mm": 300,
+        "output_channels": 3,
+        "output_dtype": "uint8",
+        "percentile_used": false,
+        "representation": "inverse",
+        "rounding_rule": "round-half-away-from-zero for nonnegative values via floor(x+0.5)",
+        "train_dependent_statistics": false,
+        "valid_output_range": [
+          1,
+          255
+        ],
+        "valid_rule": "depth_mm > 0"
+      },
       "total": 2000,
       "train": 1600,
-      "val": 400,
-      "png": 1851,
-      "jpg": 149,
-      "train_png": 1478,
-      "train_jpg": 122,
-      "val_png": 373,
-      "val_jpg": 27,
-      "missing_count": 0,
-      "duplicate_count": 0,
+      "train_label_count": 1600,
+      "train_loader_smoke": {
+        "actual_sample_count": 2,
+        "batch_obtained": true,
+        "bbox_tensor_present": true,
+        "bbox_tensor_shape": [
+          41,
+          4
+        ],
+        "bboxes_read": true,
+        "class_tensor_present": true,
+        "class_tensor_shape": [
+          41,
+          1
+        ],
+        "classes_read": true,
+        "configured_batch_size": 2,
+        "dataset_size": 1600,
+        "finite": true,
+        "image_dtype": "torch.uint8",
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocessing_stage": "Ultralytics dataset/dataloader output before trainer normalization"
+      },
       "train_val_overlap_count": 0,
-      "decoded_count": 2000,
-      "output_dtype": "uint8",
-      "channels": 3,
-      "png_channel_mismatch_count": 0,
-      "spatial_mismatch_count": 0,
-      "label_byte_mismatch_count": 0,
-      "jpg_policy": "byte_preserving_passthrough; physical unit unknown",
-      "jpg_byte_mismatch_count": 0,
-      "train_loader_smoke": {"passed": true, "dataset_count": 1600},
-      "val_loader_smoke": {"passed": true, "dataset_count": 400},
-      "near_clip_mm": 300,
-      "far_clip_mm": 19999,
-      "invalid_value": 0,
-      "valid_output_range": [1, 255],
-      "rounding_rule": "fixed half-up for nonnegative values via floor(x+0.5)",
-      "train_dependent_statistics": false,
-      "percentile_used": false,
-      "log_used": false,
-      "custom_loader": false,
-      "valid_to_zero_count": 0,
-      "invalid_to_nonzero_count": 0,
-      "observed_valid_output_min": 1,
-      "observed_valid_output_max": 255,
-      "monotonic_non_increasing": true
+      "val": 400,
+      "val_label_count": 400,
+      "val_loader_smoke": {
+        "actual_sample_count": 2,
+        "batch_obtained": true,
+        "bbox_tensor_present": true,
+        "bbox_tensor_shape": [
+          17,
+          4
+        ],
+        "bboxes_read": true,
+        "class_tensor_present": true,
+        "class_tensor_shape": [
+          17,
+          1
+        ],
+        "classes_read": true,
+        "configured_batch_size": 2,
+        "dataset_size": 400,
+        "finite": true,
+        "image_dtype": "torch.uint8",
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocessing_stage": "Ultralytics dataset/dataloader output before trainer normalization"
+      }
     }
-  ]
+  ],
+  "command": "python scripts/data/validate_depth_c2_c4.py",
+  "environment": {
+    "python38_static_compatibility": "passed",
+    "python_runtime": "3.10.21 | packaged by Anaconda, Inc. | (main, Aug 27 2026, 14:35:39) [MSC v.1942 64 bit (AMD64)]",
+    "python_version": "3.10.21",
+    "pytorch_version": "2.14.0+cpu",
+    "ultralytics_version": "8.4.146"
+  },
+  "git_head_sha": "3a3662d896ed08d184cbcae3ea30b166662310f6",
+  "overall_status": "PASS",
+  "schema_version": 2,
+  "source_contract": {
+    "labels_clean_count": 2000,
+    "labels_clean_path": "data/processed/train/labels_clean",
+    "labels_clean_sha256": "6a670b95b33e803e5d25fc30d7bbd7985cbc4799234c37ff42b3b1c9204025a4",
+    "labels_clean_total_bytes": 587886,
+    "train_count": 1600,
+    "train_split_normalized_sha256": "20b0c1fb09a6848a4700a5adc8ce1f9a6d9040a48626a1759020d7f986450969",
+    "train_split_path": "data/splits/train.txt",
+    "train_val_overlap_count": 0,
+    "val_count": 400,
+    "val_split_normalized_sha256": "336165b3509b6a0516b052c02fd98d152441300e8ae757eb0d27ca68a053ee48",
+    "val_split_path": "data/splits/val.txt"
+  }
 }

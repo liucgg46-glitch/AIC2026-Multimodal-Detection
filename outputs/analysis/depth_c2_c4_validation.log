@@ -1,0 +1,28 @@
+Command: python scripts/data/validate_depth_c2_c4.py
+Git HEAD: 3a3662d896ed08d184cbcae3ea30b166662310f6
+Python version: 3.10.21
+PyTorch version: 2.14.0+cpu
+Ultralytics version: 8.4.146
+Python 3.8 static compatibility: PASSED
+
+Candidate: validmask
+Manifest SHA256: 6d32c380bccfeb9656d2b7dc9db83e6c140dd09dae82b7a5a332da890a4d4a4e
+train: dataset_size=1600 first_batch=True shape=[2, 3, 640, 640] dtype=torch.uint8 actual_samples=2 cls_shape=[41, 1] bbox_shape=[41, 4] PASS
+val: dataset_size=400 first_batch=True shape=[2, 3, 640, 640] dtype=torch.uint8 actual_samples=2 cls_shape=[17, 1] bbox_shape=[17, 4] PASS
+
+Candidate: percentile
+Manifest SHA256: a4bf7983dbffbe0527451e321c03f1133e3615d6c88a08ac0217eb49413e6cc2
+train: dataset_size=1600 first_batch=True shape=[2, 3, 640, 640] dtype=torch.uint8 actual_samples=2 cls_shape=[41, 1] bbox_shape=[41, 4] PASS
+val: dataset_size=400 first_batch=True shape=[2, 3, 640, 640] dtype=torch.uint8 actual_samples=2 cls_shape=[17, 1] bbox_shape=[17, 4] PASS
+
+Candidate: log
+Manifest SHA256: 3990882def4c2f21c1deb7cb4cba8dd92d6bd41c518b945cce32b82fa59ff215
+train: dataset_size=1600 first_batch=True shape=[2, 3, 640, 640] dtype=torch.uint8 actual_samples=2 cls_shape=[41, 1] bbox_shape=[41, 4] PASS
+val: dataset_size=400 first_batch=True shape=[2, 3, 640, 640] dtype=torch.uint8 actual_samples=2 cls_shape=[17, 1] bbox_shape=[17, 4] PASS
+
+Candidate: inverse
+Manifest SHA256: 328f9cfc2d3a0861038d4c5af521a86700e2a538dc01f87283916568d3123e09
+train: dataset_size=1600 first_batch=True shape=[2, 3, 640, 640] dtype=torch.uint8 actual_samples=2 cls_shape=[41, 1] bbox_shape=[41, 4] PASS
+val: dataset_size=400 first_batch=True shape=[2, 3, 640, 640] dtype=torch.uint8 actual_samples=2 cls_shape=[17, 1] bbox_shape=[17, 4] PASS
+
+OVERALL: PASS
