@@ -16,6 +16,7 @@ import prepare_depth_candidate_yolo as c4
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SOURCE = Path("data/raw/test/depth")
+SOURCE_ALIASES = (SOURCE, Path("data/raw/prelim_test/depth"))
 OUTPUT = Path("data/processed/depth_inference/inverse/prelim_test")
 EXPECTED_COUNT = 1000
 EXTENSIONS = {".png", ".jpg", ".jpeg"}
@@ -32,7 +33,8 @@ def absolute(path):
 
 
 def check_paths(source, output):
-    require(source == absolute(SOURCE), "Source must be canonical data/raw/test/depth")
+    require(source in {absolute(alias) for alias in SOURCE_ALIASES},
+            "Source must be canonical data/raw/test/depth or data/raw/prelim_test/depth")
     require(output == absolute(OUTPUT), "Output must be canonical Depth inference view")
     root = PROJECT_ROOT.resolve()
     # Check lexical ancestry against an independent project anchor, including junctions.
@@ -63,6 +65,7 @@ def identity(records):
 def build_view(source, output):
     source, output = absolute(source), absolute(output)
     check_paths(source, output)
+    source_relative = source.relative_to(PROJECT_ROOT)
     before = source_inventory(source)
     images = [source / name for name in before if name != ".gitkeep"]
     require(len(images) == EXPECTED_COUNT, "Expected exactly 1000 test images")
@@ -93,7 +96,7 @@ def build_view(source, output):
         digest = c4.sha256_file(destination)
         if image.suffix.lower() != ".png":
             require(digest == before[image.name], "JPG bytes changed")
-        records.append({"stem": image.stem, "source": (SOURCE / image.name).as_posix(),
+        records.append({"stem": image.stem, "source": (source_relative / image.name).as_posix(),
                         "output": "images/" + destination.name,
                         "source_sha256": before[image.name], "output_sha256": digest})
     require(source_inventory(source) == before, "Source changed during staging")
@@ -102,7 +105,7 @@ def build_view(source, output):
     counts = Counter("png" if p.suffix.lower() == ".png" else "jpg" for p in images)
     manifest = {
         "schema_version": 1, "representation": "inverse", "purpose": "prelim_test_inference",
-        "source_path": SOURCE.as_posix(), "output_path": OUTPUT.as_posix(),
+        "source_path": source_relative.as_posix(), "output_path": OUTPUT.as_posix(),
         "total": len(records), "png_count": counts["png"], "jpg_count": counts["jpg"],
         "unique_casefold_stems": len(records), "source_unchanged": True,
         "output_dtype": "uint8", "channels": 3,

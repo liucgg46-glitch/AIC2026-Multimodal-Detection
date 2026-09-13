@@ -13,11 +13,11 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
-@pytest.fixture
-def project(tmp_path, monkeypatch):
+@pytest.fixture(params=["data/raw/test/depth", "data/raw/prelim_test/depth"])
+def project(tmp_path, monkeypatch, request):
     monkeypatch.setattr(MODULE, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(MODULE, "EXPECTED_COUNT", 2)
-    source, output = tmp_path / MODULE.SOURCE, tmp_path / MODULE.OUTPUT
+    source, output = tmp_path / request.param, tmp_path / MODULE.OUTPUT
     source.mkdir(parents=True)
     depth = np.array([[0, 1, 300, 1000, 19999, 20000, 65535]], dtype=np.uint16)
     assert cv2.imwrite(str(source / "first.PNG"), depth)
@@ -41,6 +41,9 @@ def test_real_writer_metadata_isolation_and_source_unchanged(project):
     assert (result[0, 1:] >= 1).all()
     assert (output / "images/second.jpg").read_bytes() == (source / "second.JPG").read_bytes()
     assert MODULE.source_inventory(source) == before
+    assert manifest["source_path"] == source.relative_to(MODULE.PROJECT_ROOT).as_posix()
+    assert all(r["source"] == manifest["source_path"] + "/" + Path(r["source"]).name
+               for r in manifest["files"])
     metadata = manifest["conversion"]
     assert (metadata["near_clip_mm"], metadata["far_clip_mm"], metadata["invalid_value"]) == (300, 19999, 0)
     assert metadata["valid_output_range"] == [1, 255]
@@ -100,3 +103,30 @@ def test_parent_redirection_rejected(project, monkeypatch):
 def test_python38_syntax_and_production_count():
     assert MODULE.EXPECTED_COUNT == 1000
     ast.parse(Path(MODULE.__file__).read_text(encoding="utf-8"), feature_version=(3, 8))
+
+
+@pytest.mark.parametrize("arbitrary", ["data/raw/train/depth", "data/raw/other/depth", "unrelated"])
+def test_arbitrary_source_rejected(project, arbitrary):
+    _, output = project
+    source = MODULE.PROJECT_ROOT / arbitrary
+    source.mkdir(parents=True)
+    with pytest.raises(ValueError, match="Source must be canonical"):
+        MODULE.build_view(source, output)
+    assert not output.exists()
+
+
+def test_alias_uses_same_production_api(project, monkeypatch):
+    from unittest.mock import Mock
+    source, output = project
+    writer = Mock(wraps=MODULE.c4.write_candidate_png)
+    copy = Mock(wraps=MODULE.c4.copy_isolated)
+    metadata = Mock(wraps=MODULE.c4.candidate_conversion_metadata)
+    monkeypatch.setattr(MODULE.c4, "write_candidate_png", writer)
+    monkeypatch.setattr(MODULE.c4, "copy_isolated", copy)
+    monkeypatch.setattr(MODULE.c4, "candidate_conversion_metadata", metadata)
+    MODULE.build_view(source, output)
+    assert writer.call_count == copy.call_count == 1
+    assert writer.call_args.args[0] == source / "first.PNG"
+    assert writer.call_args.args[2:] == ("inverse", None)
+    assert copy.call_args.args[0] == source / "second.JPG"
+    metadata.assert_called_once_with("inverse", None)

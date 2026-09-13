@@ -19,11 +19,17 @@ does not enforce the artifact hash. Never use a model name that could download w
 ```bash
 python scripts/data/prepare_depth_inference_yolo.py \
   --candidate inverse \
-  --source data/raw/test/depth \
+  --source data/raw/prelim_test/depth \
   --output data/processed/depth_inference/inverse/prelim_test
 ```
 
-Only the canonical source/output paths and inverse candidate are accepted. No force
+The local layout may use `data/raw/test/depth`; the current official server layout
+uses `data/raw/prelim_test/depth`. These are the only two allowed source aliases and
+use identical conversion semantics. Always explicitly pass the canonical test-depth
+directory that actually exists. The manifest records that actual project-relative
+source path, including each file record.
+
+Only these canonical source aliases, the fixed output path and inverse candidate are accepted. No force
 option is provided. Existing output fails before image processing. Failed builds
 may leave a private `.prelim_test-*` temporary sibling for inspection; no recursive
 deletion occurs. Nothing reads labels or split, or fits statistics.
@@ -59,10 +65,10 @@ S001/S002 policy; no test-based threshold tuning or training.
 
 ```bash
 python tests/test_submission_format.py \
-  --images data/raw/test/depth \
+  --images data/raw/prelim_test/depth \
   --predictions outputs/submissions/E003_DEPTH_YOLO11N_CLEAN_PRELIM_001 \
   --max-det 100
-python scripts/inference/prepare_s003_submission.py
+python scripts/inference/prepare_s003_submission.py --images data/raw/prelim_test/depth
 ```
 
 The second command reuses the existing format validator, enforces 1000 inputs/TXTs,
@@ -74,6 +80,7 @@ To create the final ZIP only when separately authorized:
 
 ```bash
 python scripts/inference/prepare_s003_submission.py \
+  --images data/raw/prelim_test/depth \
   --zip-output outputs/submissions/E003_DEPTH_YOLO11N_CLEAN_PRELIM_001.zip
 ```
 
