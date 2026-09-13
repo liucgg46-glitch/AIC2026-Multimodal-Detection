@@ -230,16 +230,24 @@ LetterBox, graph construction and forward without modifying data. Each batch
 smoke requires a clean, detached exact SHA. It constructs the real
 `FusionTrainer`, calls `_setup_train()`, and checks the resulting train loader,
 formal 2x validation loader, validator, ModelEMA, AMP scaler, AdamW optimizer,
-scheduler, and accumulation. It then performs two real
-preprocess/loss/AMP-backward/`trainer.optimizer_step()` cycles from one real
-train-loader iterator. Step 1 must materialize finite AdamW state. Step 2 checks
-that the same state is already resident before its forward/backward, retains
-valid state afterward, and advances EMA for a total delta of two. Only then does
+scheduler, and accumulation. It then performs real
+preprocess/loss/AMP-backward/`trainer.optimizer_step()` attempts from one real
+train-loader iterator. Phase 1 allows up to eight attempts to obtain the first
+real AdamW step. A GradScaler overflow backoff is recorded as a legal skipped
+step and does not require optimizer state to materialize. A real step requires
+the AdamW per-parameter `step` marker to advance; after that first success the
+state must be materialized and finite. Phase 2 allows up to eight more attempts,
+with AdamW state required to be resident before every backward, until a second
+real marker advance completes with finite loss and state. The report includes
+per-attempt scaler values, optimizer-state counts and step markers. EMA updates
+must equal upstream `optimizer_step()` calls, including AMP skips, so EMA delta
+may be greater than the two successful AdamW steps. Only then does
 the smoke perform one first-batch forward through the formal validation loader.
 
-For target batch 32, PASS therefore requires two train batch 32 optimization
-cycles, including the state-resident second backward, plus formal validation
-batch 64 first-batch forward. A val64 OOM is
+For target batch 32, PASS therefore requires two successful train batch 32
+optimizer steps, including the state-resident second successful backward, plus
+any recorded AMP-skipped attempts and formal validation batch 64 first-batch
+forward. A val64 OOM is
 a failed batch-32 feasibility result; this smoke does not change validation
 batch policy. Metric integration is checked separately with a `Subset` whose
 dataset length is exactly one. `trainer.save_model()` writes a temporary
@@ -282,14 +290,18 @@ Third-round runtime-fidelity verification:
 - Targeted runtime/control/checkpoint tests: 13 passed against source-isolated
   Ultralytics 8.4.144 and 13 passed against source-isolated 8.3.253.
 - All fusion tests excluding the separately privileged canonical decode case:
-  56 passed, 1 deselected on each audited Ultralytics source tree.
+  57 passed, 1 deselected on each audited Ultralytics source tree after the AMP
+  skip-detection micro-fix. The canonical 2000-pair case also passed separately
+  on both 8.3.253 and 8.4.144.
 - Full repository `tests/` on the 8.4.144 source tree: 288 passed, 1 existing
   Windows symlink skip, 1 canonical-data case deselected. The canonical case was
   run again after the final memory-fidelity micro-fix and passed after decoding
   all 2000 pairs in 126.86 seconds.
 - The runtime tests call actual upstream `_setup_train()`, resolve AdamW at 2500
   iterations, assert accumulation 2 and validation batch 64 for physical batch
-  32, execute a second backward with resident AdamW state and EMA delta two, and
+  32, tolerate and record a legal first AMP skip, obtain two marker-confirmed
+  AdamW steps, execute the second successful backward with resident optimizer
+  state, require EMA delta to match all optimizer-step calls, and
   exercise `save_model -> strip_optimizer -> load_checkpoint -> DetectionValidator(path)`.
 - These third-round commands used the audited wheels without installing them.
   This shell exposed Python 3.14.2, torch 2.9.1+cpu, and torchvision

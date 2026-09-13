@@ -73,9 +73,14 @@ def test_server_smoke_uses_real_setup_optimizer_and_checkpoint_apis():
     assert "trainer.save_model()" in source
     assert "strip_optimizer(" in source
     assert "load_checkpoint(" in source
-    assert "require_optimizer_state=True" in source
-    # One definition plus exactly two calls from main.
-    assert source.count("_optimization_cycle(trainer, train_iter") == 3
+    assert "_run_two_successful_optimizer_steps(trainer, train_iter)" in source
+    assert "max_attempts_per_success=8" in source
+    assert "require_optimizer_state=target_success == 2" in source
+    assert '"scaler_scale_before"' in source
+    assert '"scaler_scale_after"' in source
+    assert '"optimizer_state_step_marker_before"' in source
+    assert '"optimizer_state_step_marker_after"' in source
+    assert '"amp_skipped_optimizer_step"' in source
     assert '"ema_updates_delta"' in source
     assert '"two_training_steps_passed": True' in source
     assert "torch.optim.SGD" not in source
@@ -168,31 +173,98 @@ class TinyLossModel(torch.nn.Module):
         return loss, loss.detach().reshape(1)
 
 
-def test_second_optimization_cycle_starts_with_resident_adamw_state():
-    from scripts.train.smoke_fusion_server import _optimization_cycle
-
+def _tiny_optimizer_trainer(scaler=None):
     trainer = FusionTrainer.__new__(FusionTrainer)
     trainer.model = TinyLossModel()
     trainer.optimizer = torch.optim.AdamW(trainer.model.parameters(), lr=1e-3)
-    trainer.scaler = _disabled_scaler()
+    trainer.scaler = scaler or _disabled_scaler()
     trainer.ema = ModelEMA(trainer.model)
     trainer.amp = False
     trainer.device = torch.device("cpu")
     trainer.preprocess_batch = lambda batch: batch
-    train_iter = iter([
+    return trainer
+
+
+def _three_tiny_batches():
+    return iter([
         {"x": torch.tensor([2.0]), "target": torch.tensor([0.0])},
         {"x": torch.tensor([3.0]), "target": torch.tensor([0.0])},
+        {"x": torch.tensor([4.0]), "target": torch.tensor([0.0])},
     ])
 
-    ema_before = trainer.ema.updates
-    step1 = _optimization_cycle(trainer, train_iter)
+
+def test_second_successful_step_starts_with_resident_adamw_state():
+    from scripts.train.smoke_fusion_server import _run_two_successful_optimizer_steps
+
+    trainer = _tiny_optimizer_trainer()
+    report = _run_two_successful_optimizer_steps(trainer, _three_tiny_batches())
+
+    step1, step2 = report["optimization_attempts"]
     assert step1["optimizer_state_entries_before"] == 0
     assert step1["optimizer_state_entries_after"] > 0
-    step2 = _optimization_cycle(trainer, train_iter, require_optimizer_state=True)
     assert step2["optimizer_state_entries_before"] == step1["optimizer_state_entries_after"]
     assert step2["optimizer_state_entries_after"] >= step1["optimizer_state_entries_after"]
-    assert trainer.ema.updates - ema_before == 2
+    assert step2["optimizer_state_step_marker_after"]["sum"] > step2["optimizer_state_step_marker_before"]["sum"]
+    assert report["optimizer_step_calls"] == 2
+    assert report["successful_optimizer_steps"] == 2
+    assert report["amp_skipped_steps"] == 0
+    assert report["ema_updates_delta"] == 2
+    assert report["first_success_attempt"] == 1
+    assert report["second_success_attempt"] == 2
     assert np.isfinite(step2["loss"])
+
+
+class SkipFirstGradScaler:
+    """Minimal scaler that reproduces one legal overflow skip, then real steps."""
+
+    def __init__(self, initial_scale=65536.0):
+        self._scale = initial_scale
+        self._calls = 0
+        self._skipped = False
+
+    def get_scale(self):
+        return self._scale
+
+    @staticmethod
+    def scale(loss):
+        return loss
+
+    @staticmethod
+    def unscale_(optimizer):
+        return None
+
+    def step(self, optimizer):
+        self._calls += 1
+        self._skipped = self._calls == 1
+        if not self._skipped:
+            optimizer.step()
+
+    def update(self):
+        if self._skipped:
+            self._scale /= 2.0
+
+
+def test_first_amp_skip_is_recorded_then_two_real_adamw_steps_succeed():
+    from scripts.train.smoke_fusion_server import _run_two_successful_optimizer_steps
+
+    trainer = _tiny_optimizer_trainer(SkipFirstGradScaler())
+    report = _run_two_successful_optimizer_steps(trainer, _three_tiny_batches())
+
+    skipped, first_success, second_success = report["optimization_attempts"]
+    assert skipped["amp_skipped_optimizer_step"] is True
+    assert skipped["successful_optimizer_step"] is False
+    assert skipped["scaler_scale_after"] < skipped["scaler_scale_before"]
+    assert skipped["optimizer_state_entries_after"] == 0
+    assert first_success["successful_optimizer_step"] is True
+    assert first_success["optimizer_state_entries_after"] > 0
+    assert second_success["optimizer_state_entries_before"] == first_success["optimizer_state_entries_after"]
+    assert second_success["optimizer_state_step_marker_after"]["sum"] > second_success["optimizer_state_step_marker_before"]["sum"]
+    assert report["optimizer_step_calls"] == 3
+    assert report["successful_optimizer_steps"] == 2
+    assert report["amp_skipped_steps"] == 1
+    assert report["ema_updates_delta"] == 3
+    assert report["first_success_attempt"] == 2
+    assert report["second_success_attempt"] == 3
 
 
 def test_ultralytics_checkpoint_path_restores_and_validates_one_image(tmp_path, hyp, monkeypatch):

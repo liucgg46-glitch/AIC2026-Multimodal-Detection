@@ -91,10 +91,46 @@ def _optimizer_state_is_finite(optimizer):
     )
 
 
-def _optimization_cycle(trainer, train_iter, require_optimizer_state=False):
+def _optimizer_step_snapshot(optimizer):
+    snapshot = {}
+    for parameter, state in optimizer.state.items():
+        if "step" not in state:
+            continue
+        step = state["step"]
+        if isinstance(step, torch.Tensor):
+            if step.numel() != 1 or not torch.isfinite(step).all():
+                raise RuntimeError("AdamW state step marker is invalid")
+            step = float(step.detach().cpu())
+        else:
+            step = float(step)
+        snapshot[id(parameter)] = step
+    return snapshot
+
+
+def _step_marker_report(snapshot):
+    values = list(snapshot.values())
+    return {
+        "count": len(values),
+        "minimum": min(values) if values else None,
+        "maximum": max(values) if values else None,
+        "sum": sum(values) if values else 0.0,
+    }
+
+
+def _step_marker_advanced(before, after):
+    if any(after.get(key, value) < value for key, value in before.items()):
+        raise RuntimeError("AdamW state step marker decreased")
+    return any(value > before.get(key, 0.0) for key, value in after.items())
+
+
+def _optimization_attempt(trainer, train_iter, require_optimizer_state=False):
     state_entries_before = len(trainer.optimizer.state)
-    if require_optimizer_state and state_entries_before == 0:
+    marker_before = _optimizer_step_snapshot(trainer.optimizer)
+    if require_optimizer_state and (state_entries_before == 0 or not marker_before):
         raise RuntimeError("Second backward must start with materialized AdamW state")
+    if state_entries_before and not _optimizer_state_is_finite(trainer.optimizer):
+        raise RuntimeError("AdamW state is non-finite before backward")
+    scale_before = float(trainer.scaler.get_scale())
     batch = trainer.preprocess_batch(next(train_iter))
     with autocast(trainer.amp):
         loss, loss_items = trainer.model(batch)
@@ -104,19 +140,96 @@ def _optimization_cycle(trainer, train_iter, require_optimizer_state=False):
         raise RuntimeError("Non-finite training loss")
     trainer.scaler.scale(trainer.loss).backward()
     trainer.optimizer_step()
+    scale_after = float(trainer.scaler.get_scale())
     state_entries_after = len(trainer.optimizer.state)
-    if state_entries_after == 0 or not _optimizer_state_is_finite(trainer.optimizer):
-        raise RuntimeError("AdamW state is absent or non-finite after optimizer_step")
+    marker_after = _optimizer_step_snapshot(trainer.optimizer)
+    marker_advanced = _step_marker_advanced(marker_before, marker_after)
+    scale_backoff = scale_after < scale_before
+    if scale_backoff and marker_advanced:
+        raise RuntimeError("GradScaler backed off despite an advanced AdamW step marker")
+    amp_skipped = scale_backoff and not marker_advanced
+    successful_step = marker_advanced and not scale_backoff
+    if not amp_skipped and not successful_step:
+        raise RuntimeError("optimizer_step outcome is neither an AMP skip nor a real AdamW step")
+    if state_entries_after and not _optimizer_state_is_finite(trainer.optimizer):
+        raise RuntimeError("AdamW state is non-finite after optimizer_step")
     result = {
         "loss": float(trainer.loss.detach().cpu()),
         "loss_items_type": type(loss_items).__name__,
+        "scaler_scale_before": scale_before,
+        "scaler_scale_after": scale_after,
         "optimizer_state_entries_before": state_entries_before,
         "optimizer_state_entries_after": state_entries_after,
+        "optimizer_state_step_marker_before": _step_marker_report(marker_before),
+        "optimizer_state_step_marker_after": _step_marker_report(marker_after),
+        "amp_skipped_optimizer_step": amp_skipped,
+        "successful_optimizer_step": successful_step,
     }
     trainer.loss = None
     del batch, loss, loss_items
     torch.cuda.empty_cache()
     return result
+
+
+def _run_two_successful_optimizer_steps(trainer, train_iter, max_attempts_per_success=8):
+    attempts = []
+    successful_steps = 0
+    skipped_steps = 0
+    optimizer_step_calls = 0
+    first_success_attempt = None
+    second_success_attempt = None
+    scaler_initial = float(trainer.scaler.get_scale())
+    ema_updates_before = trainer.ema.updates
+
+    for target_success in (1, 2):
+        for _ in range(max_attempts_per_success):
+            optimizer_step_calls += 1
+            result = _optimization_attempt(
+                trainer,
+                train_iter,
+                require_optimizer_state=target_success == 2,
+            )
+            result["attempt"] = optimizer_step_calls
+            attempts.append(result)
+            if result["amp_skipped_optimizer_step"]:
+                skipped_steps += 1
+                continue
+            successful_steps += 1
+            if target_success == 1:
+                first_success_attempt = optimizer_step_calls
+                if not trainer.optimizer.state or not _optimizer_state_is_finite(trainer.optimizer):
+                    raise RuntimeError("First real AdamW step did not materialize finite optimizer state")
+            else:
+                second_success_attempt = optimizer_step_calls
+            break
+        else:
+            raise RuntimeError(
+                "No successful AdamW step within %d attempts for success %d"
+                % (max_attempts_per_success, target_success)
+            )
+
+    ema_updates_delta = trainer.ema.updates - ema_updates_before
+    if ema_updates_delta != optimizer_step_calls:
+        raise RuntimeError("EMA updates must match upstream optimizer_step calls, including AMP skips")
+    if successful_steps != 2:
+        raise RuntimeError("Smoke requires exactly two successful AdamW steps")
+    final_marker = _optimizer_step_snapshot(trainer.optimizer)
+    if not final_marker or not _optimizer_state_is_finite(trainer.optimizer):
+        raise RuntimeError("Final AdamW state is absent or non-finite")
+    return {
+        "optimization_attempts": attempts,
+        "amp_skipped_steps": skipped_steps,
+        "successful_optimizer_steps": successful_steps,
+        "optimizer_step_calls": optimizer_step_calls,
+        "scaler_initial": scaler_initial,
+        "scaler_final": float(trainer.scaler.get_scale()),
+        "first_success_attempt": first_success_attempt,
+        "second_success_attempt": second_success_attempt,
+        "optimizer_state_entries": len(trainer.optimizer.state),
+        "optimizer_state_step_marker": _step_marker_report(final_marker),
+        "ema_updates_delta": ema_updates_delta,
+        "two_training_steps_passed": True,
+    }
 
 
 def _save_and_reload_checkpoint(trainer, temporary_root, imgsz):
@@ -210,17 +323,7 @@ def main():
             trainer.model.train()
             trainer.optimizer.zero_grad()
             train_iter = iter(trainer.train_loader)
-            ema_updates_before = trainer.ema.updates
-            step1 = _optimization_cycle(trainer, train_iter)
-            if trainer.ema.updates != ema_updates_before + 1:
-                raise RuntimeError("ModelEMA did not update after optimization step 1")
-            step2 = _optimization_cycle(trainer, train_iter, require_optimizer_state=True)
-            if trainer.ema.updates != ema_updates_before + 2:
-                raise RuntimeError("ModelEMA update delta is not 2")
-            if step2["optimizer_state_entries_before"] != step1["optimizer_state_entries_after"]:
-                raise RuntimeError("AdamW state was not resident when the second backward started")
-            if step2["optimizer_state_entries_after"] < step1["optimizer_state_entries_after"]:
-                raise RuntimeError("AdamW state entries disappeared after optimization step 2")
+            optimization_report = _run_two_successful_optimizer_steps(trainer, train_iter)
 
             formal_val_shape, formal_val_output_type = _formal_validation_first_batch(trainer)
             checkpoint, restored_shape, metrics, metric_dataset_length, strip_report = _save_and_reload_checkpoint(
@@ -233,14 +336,9 @@ def main():
                 "branch": state[2],
                 "batch": args.batch,
                 "imgsz": args.imgsz,
-                "first_step_loss": step1["loss"],
-                "second_step_loss": step2["loss"],
-                "loss_items_type": step2["loss_items_type"],
-                "optimizer_state_entries_after_step1": step1["optimizer_state_entries_after"],
-                "optimizer_state_entries_before_step2": step2["optimizer_state_entries_before"],
-                "optimizer_state_entries_after_step2": step2["optimizer_state_entries_after"],
-                "ema_updates_delta": trainer.ema.updates - ema_updates_before,
-                "two_training_steps_passed": True,
+                **optimization_report,
+                "second_step_loss": optimization_report["optimization_attempts"][-1]["loss"],
+                "loss_items_type": optimization_report["optimization_attempts"][-1]["loss_items_type"],
                 "formal_val_first_batch_shape": formal_val_shape,
                 "formal_val_output_type": formal_val_output_type,
                 "one_image_validator_dataset_length": metric_dataset_length,
