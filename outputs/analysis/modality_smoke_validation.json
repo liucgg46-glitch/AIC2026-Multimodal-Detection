@@ -1,0 +1,1039 @@
+{
+  "accuracy_evaluated": false,
+  "backward_executed": false,
+  "batch_size": 2,
+  "checkpoint_written": false,
+  "cuda_available": false,
+  "device": "cpu",
+  "font_download_suppressed": true,
+  "git_head_sha": "312bf6aae2933979e498f2bd1ef391daaba5bd57",
+  "imgsz": 640,
+  "label_cache_write_suppressed": true,
+  "local_runtime_pass": true,
+  "model_architecture": "yolo11n.yaml",
+  "model_class_count": 12,
+  "model_input_channels": 3,
+  "optimizer_step_executed": false,
+  "predict_executed": false,
+  "python38_runtime_validated": false,
+  "python38_static_compatibility": "passed",
+  "python_version": "3.10.21",
+  "pytorch_version": "2.14.0+cpu",
+  "random_initialization": true,
+  "schema": "aic2026.modality_smoke_validation.v1",
+  "seed": 2026,
+  "source_and_staging_safety": {
+    "data_raw_unchanged": true,
+    "depth_compat8_staging_unchanged": true,
+    "depth_inverse_staging_unchanged": true,
+    "depth_log_staging_unchanged": true,
+    "depth_percentile_staging_unchanged": true,
+    "depth_validmask_staging_unchanged": true,
+    "ir_raw3_staging_unchanged": true,
+    "labels_clean_unchanged": true,
+    "train_split_unchanged": true,
+    "val_split_unchanged": true
+  },
+  "training_started": false,
+  "ultralytics_version": "8.4.146",
+  "views": [
+    {
+      "data_yaml": "data/processed/ir_trainable/raw3/data.yaml",
+      "declared_channels": 3,
+      "declared_class_count": 12,
+      "forward_result": {
+        "all_float_tensors_finite": true,
+        "batch_dimension_match": true,
+        "forward_completed": true,
+        "output_type": "tuple",
+        "tensor_count": 6,
+        "tensor_summaries": [
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              16,
+              8400
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              64,
+              8400
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              64,
+              80,
+              80
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              128,
+              40,
+              40
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              256,
+              20,
+              20
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              12,
+              8400
+            ]
+          }
+        ]
+      },
+      "modality": "infrared",
+      "path_portability": {
+        "linux_portable": false,
+        "windows_local": true
+      },
+      "portability_warning": "Windows absolute dataset path; local runtime only, Linux server path requires separate cleanup",
+      "train_dataset_size": 1600,
+      "train_first_batch": {
+        "actual_batch_size": 2,
+        "batch_idx_present": true,
+        "batch_obtained": true,
+        "bboxes_finite": true,
+        "bboxes_present": true,
+        "bboxes_shape": [
+          29,
+          4
+        ],
+        "cls_finite": true,
+        "cls_present": true,
+        "cls_shape": [
+          29,
+          1
+        ],
+        "dataset_size": 1600,
+        "im_file_present": true,
+        "image_dtype": "torch.uint8",
+        "image_finite": true,
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ]
+      },
+      "train_preprocessed_batch": {
+        "image_dtype": "torch.float32",
+        "image_finite": true,
+        "image_max": 1.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocess_completed": true
+      },
+      "val_dataset_size": 400,
+      "val_first_batch": {
+        "actual_batch_size": 2,
+        "batch_idx_present": true,
+        "batch_obtained": true,
+        "bboxes_finite": true,
+        "bboxes_present": true,
+        "bboxes_shape": [
+          17,
+          4
+        ],
+        "cls_finite": true,
+        "cls_present": true,
+        "cls_shape": [
+          17,
+          1
+        ],
+        "dataset_size": 400,
+        "im_file_present": true,
+        "image_dtype": "torch.uint8",
+        "image_finite": true,
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ]
+      },
+      "val_preprocessed_batch": {
+        "image_dtype": "torch.float32",
+        "image_finite": true,
+        "image_max": 1.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocess_completed": true
+      },
+      "view": "ir_raw3",
+      "view_pass": true,
+      "yaml_parse_pass": true
+    },
+    {
+      "data_yaml": "data/processed/depth_trainable/compat8/data.yaml",
+      "declared_channels": 3,
+      "declared_class_count": 12,
+      "forward_result": {
+        "all_float_tensors_finite": true,
+        "batch_dimension_match": true,
+        "forward_completed": true,
+        "output_type": "tuple",
+        "tensor_count": 6,
+        "tensor_summaries": [
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              16,
+              8400
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              64,
+              8400
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              64,
+              80,
+              80
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              128,
+              40,
+              40
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              256,
+              20,
+              20
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              12,
+              8400
+            ]
+          }
+        ]
+      },
+      "modality": "depth",
+      "path_portability": {
+        "linux_portable": false,
+        "windows_local": true
+      },
+      "portability_warning": "Windows absolute dataset path; local runtime only, Linux server path requires separate cleanup",
+      "train_dataset_size": 1600,
+      "train_first_batch": {
+        "actual_batch_size": 2,
+        "batch_idx_present": true,
+        "batch_obtained": true,
+        "bboxes_finite": true,
+        "bboxes_present": true,
+        "bboxes_shape": [
+          29,
+          4
+        ],
+        "cls_finite": true,
+        "cls_present": true,
+        "cls_shape": [
+          29,
+          1
+        ],
+        "dataset_size": 1600,
+        "im_file_present": true,
+        "image_dtype": "torch.uint8",
+        "image_finite": true,
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ]
+      },
+      "train_preprocessed_batch": {
+        "image_dtype": "torch.float32",
+        "image_finite": true,
+        "image_max": 1.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocess_completed": true
+      },
+      "val_dataset_size": 400,
+      "val_first_batch": {
+        "actual_batch_size": 2,
+        "batch_idx_present": true,
+        "batch_obtained": true,
+        "bboxes_finite": true,
+        "bboxes_present": true,
+        "bboxes_shape": [
+          17,
+          4
+        ],
+        "cls_finite": true,
+        "cls_present": true,
+        "cls_shape": [
+          17,
+          1
+        ],
+        "dataset_size": 400,
+        "im_file_present": true,
+        "image_dtype": "torch.uint8",
+        "image_finite": true,
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ]
+      },
+      "val_preprocessed_batch": {
+        "image_dtype": "torch.float32",
+        "image_finite": true,
+        "image_max": 1.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocess_completed": true
+      },
+      "view": "depth_compat8",
+      "view_pass": true,
+      "yaml_parse_pass": true
+    },
+    {
+      "data_yaml": "data/processed/depth_trainable/validmask/data.yaml",
+      "declared_channels": 3,
+      "declared_class_count": 12,
+      "forward_result": {
+        "all_float_tensors_finite": true,
+        "batch_dimension_match": true,
+        "forward_completed": true,
+        "output_type": "tuple",
+        "tensor_count": 6,
+        "tensor_summaries": [
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              16,
+              8400
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              64,
+              8400
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              64,
+              80,
+              80
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              128,
+              40,
+              40
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              256,
+              20,
+              20
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              12,
+              8400
+            ]
+          }
+        ]
+      },
+      "modality": "depth",
+      "path_portability": {
+        "linux_portable": true,
+        "windows_local": true
+      },
+      "portability_warning": null,
+      "train_dataset_size": 1600,
+      "train_first_batch": {
+        "actual_batch_size": 2,
+        "batch_idx_present": true,
+        "batch_obtained": true,
+        "bboxes_finite": true,
+        "bboxes_present": true,
+        "bboxes_shape": [
+          29,
+          4
+        ],
+        "cls_finite": true,
+        "cls_present": true,
+        "cls_shape": [
+          29,
+          1
+        ],
+        "dataset_size": 1600,
+        "im_file_present": true,
+        "image_dtype": "torch.uint8",
+        "image_finite": true,
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ]
+      },
+      "train_preprocessed_batch": {
+        "image_dtype": "torch.float32",
+        "image_finite": true,
+        "image_max": 1.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocess_completed": true
+      },
+      "val_dataset_size": 400,
+      "val_first_batch": {
+        "actual_batch_size": 2,
+        "batch_idx_present": true,
+        "batch_obtained": true,
+        "bboxes_finite": true,
+        "bboxes_present": true,
+        "bboxes_shape": [
+          17,
+          4
+        ],
+        "cls_finite": true,
+        "cls_present": true,
+        "cls_shape": [
+          17,
+          1
+        ],
+        "dataset_size": 400,
+        "im_file_present": true,
+        "image_dtype": "torch.uint8",
+        "image_finite": true,
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ]
+      },
+      "val_preprocessed_batch": {
+        "image_dtype": "torch.float32",
+        "image_finite": true,
+        "image_max": 1.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocess_completed": true
+      },
+      "view": "depth_validmask",
+      "view_pass": true,
+      "yaml_parse_pass": true
+    },
+    {
+      "data_yaml": "data/processed/depth_trainable/percentile/data.yaml",
+      "declared_channels": 3,
+      "declared_class_count": 12,
+      "forward_result": {
+        "all_float_tensors_finite": true,
+        "batch_dimension_match": true,
+        "forward_completed": true,
+        "output_type": "tuple",
+        "tensor_count": 6,
+        "tensor_summaries": [
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              16,
+              8400
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              64,
+              8400
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              64,
+              80,
+              80
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              128,
+              40,
+              40
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              256,
+              20,
+              20
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              12,
+              8400
+            ]
+          }
+        ]
+      },
+      "modality": "depth",
+      "path_portability": {
+        "linux_portable": true,
+        "windows_local": true
+      },
+      "portability_warning": null,
+      "train_dataset_size": 1600,
+      "train_first_batch": {
+        "actual_batch_size": 2,
+        "batch_idx_present": true,
+        "batch_obtained": true,
+        "bboxes_finite": true,
+        "bboxes_present": true,
+        "bboxes_shape": [
+          29,
+          4
+        ],
+        "cls_finite": true,
+        "cls_present": true,
+        "cls_shape": [
+          29,
+          1
+        ],
+        "dataset_size": 1600,
+        "im_file_present": true,
+        "image_dtype": "torch.uint8",
+        "image_finite": true,
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ]
+      },
+      "train_preprocessed_batch": {
+        "image_dtype": "torch.float32",
+        "image_finite": true,
+        "image_max": 1.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocess_completed": true
+      },
+      "val_dataset_size": 400,
+      "val_first_batch": {
+        "actual_batch_size": 2,
+        "batch_idx_present": true,
+        "batch_obtained": true,
+        "bboxes_finite": true,
+        "bboxes_present": true,
+        "bboxes_shape": [
+          17,
+          4
+        ],
+        "cls_finite": true,
+        "cls_present": true,
+        "cls_shape": [
+          17,
+          1
+        ],
+        "dataset_size": 400,
+        "im_file_present": true,
+        "image_dtype": "torch.uint8",
+        "image_finite": true,
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ]
+      },
+      "val_preprocessed_batch": {
+        "image_dtype": "torch.float32",
+        "image_finite": true,
+        "image_max": 1.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocess_completed": true
+      },
+      "view": "depth_percentile",
+      "view_pass": true,
+      "yaml_parse_pass": true
+    },
+    {
+      "data_yaml": "data/processed/depth_trainable/log/data.yaml",
+      "declared_channels": 3,
+      "declared_class_count": 12,
+      "forward_result": {
+        "all_float_tensors_finite": true,
+        "batch_dimension_match": true,
+        "forward_completed": true,
+        "output_type": "tuple",
+        "tensor_count": 6,
+        "tensor_summaries": [
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              16,
+              8400
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              64,
+              8400
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              64,
+              80,
+              80
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              128,
+              40,
+              40
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              256,
+              20,
+              20
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              12,
+              8400
+            ]
+          }
+        ]
+      },
+      "modality": "depth",
+      "path_portability": {
+        "linux_portable": true,
+        "windows_local": true
+      },
+      "portability_warning": null,
+      "train_dataset_size": 1600,
+      "train_first_batch": {
+        "actual_batch_size": 2,
+        "batch_idx_present": true,
+        "batch_obtained": true,
+        "bboxes_finite": true,
+        "bboxes_present": true,
+        "bboxes_shape": [
+          29,
+          4
+        ],
+        "cls_finite": true,
+        "cls_present": true,
+        "cls_shape": [
+          29,
+          1
+        ],
+        "dataset_size": 1600,
+        "im_file_present": true,
+        "image_dtype": "torch.uint8",
+        "image_finite": true,
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ]
+      },
+      "train_preprocessed_batch": {
+        "image_dtype": "torch.float32",
+        "image_finite": true,
+        "image_max": 1.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocess_completed": true
+      },
+      "val_dataset_size": 400,
+      "val_first_batch": {
+        "actual_batch_size": 2,
+        "batch_idx_present": true,
+        "batch_obtained": true,
+        "bboxes_finite": true,
+        "bboxes_present": true,
+        "bboxes_shape": [
+          17,
+          4
+        ],
+        "cls_finite": true,
+        "cls_present": true,
+        "cls_shape": [
+          17,
+          1
+        ],
+        "dataset_size": 400,
+        "im_file_present": true,
+        "image_dtype": "torch.uint8",
+        "image_finite": true,
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ]
+      },
+      "val_preprocessed_batch": {
+        "image_dtype": "torch.float32",
+        "image_finite": true,
+        "image_max": 1.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocess_completed": true
+      },
+      "view": "depth_log",
+      "view_pass": true,
+      "yaml_parse_pass": true
+    },
+    {
+      "data_yaml": "data/processed/depth_trainable/inverse/data.yaml",
+      "declared_channels": 3,
+      "declared_class_count": 12,
+      "forward_result": {
+        "all_float_tensors_finite": true,
+        "batch_dimension_match": true,
+        "forward_completed": true,
+        "output_type": "tuple",
+        "tensor_count": 6,
+        "tensor_summaries": [
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              16,
+              8400
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              64,
+              8400
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              64,
+              80,
+              80
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              128,
+              40,
+              40
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              256,
+              20,
+              20
+            ]
+          },
+          {
+            "dtype": "torch.float32",
+            "finite": true,
+            "shape": [
+              2,
+              12,
+              8400
+            ]
+          }
+        ]
+      },
+      "modality": "depth",
+      "path_portability": {
+        "linux_portable": true,
+        "windows_local": true
+      },
+      "portability_warning": null,
+      "train_dataset_size": 1600,
+      "train_first_batch": {
+        "actual_batch_size": 2,
+        "batch_idx_present": true,
+        "batch_obtained": true,
+        "bboxes_finite": true,
+        "bboxes_present": true,
+        "bboxes_shape": [
+          29,
+          4
+        ],
+        "cls_finite": true,
+        "cls_present": true,
+        "cls_shape": [
+          29,
+          1
+        ],
+        "dataset_size": 1600,
+        "im_file_present": true,
+        "image_dtype": "torch.uint8",
+        "image_finite": true,
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ]
+      },
+      "train_preprocessed_batch": {
+        "image_dtype": "torch.float32",
+        "image_finite": true,
+        "image_max": 1.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocess_completed": true
+      },
+      "val_dataset_size": 400,
+      "val_first_batch": {
+        "actual_batch_size": 2,
+        "batch_idx_present": true,
+        "batch_obtained": true,
+        "bboxes_finite": true,
+        "bboxes_present": true,
+        "bboxes_shape": [
+          17,
+          4
+        ],
+        "cls_finite": true,
+        "cls_present": true,
+        "cls_shape": [
+          17,
+          1
+        ],
+        "dataset_size": 400,
+        "im_file_present": true,
+        "image_dtype": "torch.uint8",
+        "image_finite": true,
+        "image_max": 255.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ]
+      },
+      "val_preprocessed_batch": {
+        "image_dtype": "torch.float32",
+        "image_finite": true,
+        "image_max": 1.0,
+        "image_min": 0.0,
+        "image_shape": [
+          2,
+          3,
+          640,
+          640
+        ],
+        "preprocess_completed": true
+      },
+      "view": "depth_inverse",
+      "view_pass": true,
+      "yaml_parse_pass": true
+    }
+  ],
+  "weights_source": "none",
+  "workers": 0
+}
