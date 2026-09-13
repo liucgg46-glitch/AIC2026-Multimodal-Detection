@@ -1,0 +1,64 @@
+experiment_id: F001_RGB_IR_GATED_P45_YOLO11N
+architecture:
+  encoders: independent_yolo11n
+  fusion_levels: [P4, P5]
+  p3: rgb_backbone_only
+  zero_init: true
+  pretrained: weights/yolo11n.pt
+  pretrained_sha256: 0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1
+data_configuration:
+  rgb: data/raw/train/visible
+  ir: data/raw/train/infrared
+  ir_representation: E002_raw3_byte_preserving_source
+  labels: data/processed/train/labels_clean
+  train: data/splits/train.txt
+  val: data/splits/val.txt
+  counts: [1600, 400]
+train:
+  model: yolo11n.yaml
+  data: configs/data/F001_RGB_IR_RAW3.yaml
+  task: detect
+  seed: 2026
+  deterministic: true
+  imgsz: 640
+  epochs: 100
+  batch: 32
+  workers: 8
+  device: 0
+  pretrained: weights/yolo11n.pt
+  amp: true
+  plots: false
+  cache: false
+  rect: false
+  resume: false
+  compile: false
+  fraction: 1.0
+  close_mosaic: 0
+  degrees: 0.0
+  translate: 0.0
+  scale: 0.0
+  shear: 0.0
+  perspective: 0.0
+  mosaic: 0.0
+  mixup: 0.0
+  cutmix: 0.0
+  copy_paste: 0.0
+  multi_scale: false
+  bgr: 0.0
+  fliplr: 0.5
+  flipud: 0.0
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  optimizer: auto
+  nbs: 64
+  project: runs
+  name: F001_RGB_IR_GATED_P45_YOLO11N
+  exist_ok: false
+batch_policy:
+  canonical_target_batch: 32
+  server_feasibility_sequence: [1, 2, 8, 16, 32]
+  gradient_accumulation: ultralytics_default_nbs_64
+  formal_accumulate_after_warmup: 2
+  nominal_effective_batch: 64
+  rule: do_not_change_formal_batch_without_recording_a_new_experimental_variable
