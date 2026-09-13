@@ -83,6 +83,11 @@ def test_server_smoke_uses_real_setup_optimizer_and_checkpoint_apis():
     assert '"amp_skipped_optimizer_step"' in source
     assert '"ema_updates_delta"' in source
     assert '"two_training_steps_passed": True' in source
+    assert "_cleanup_runtime_loaders(trainer, train_iter)" in source
+    assert '"dataloader_cleanup_passed": True' in source
+    assert '"train_workers_shutdown"' in source
+    assert '"val_workers_shutdown"' in source
+    assert source.rfind("print(json.dumps(final_report") > source.rfind("_cleanup_runtime_loaders(trainer, train_iter)")
     assert "torch.optim.SGD" not in source
     assert "FusionTrainer.__new__" not in source
     assert "trainer.train()" not in source
@@ -155,6 +160,57 @@ def test_one_image_loader_is_really_length_one():
     loader = one_image_loader(TinyDataset(3))
     assert len(loader.dataset) == 1
     assert next(iter(loader)) == [torch.tensor(0)]
+
+
+class FakeWorkerIterator:
+    def __init__(self, failure=None):
+        self.calls = 0
+        self.failure = failure
+
+    def _shutdown_workers(self):
+        self.calls += 1
+        if self.failure is not None:
+            raise self.failure
+
+
+class FakeWorkerLoader:
+    def __init__(self, iterator):
+        self.num_workers = 8
+        self._iterator = iterator
+        self.iterator = iterator
+
+
+def test_shutdown_loader_calls_worker_shutdown_once_and_is_repeatable():
+    from scripts.train.smoke_fusion_server import _shutdown_loader
+
+    iterator = FakeWorkerIterator()
+    loader = FakeWorkerLoader(iterator)
+    assert _shutdown_loader(loader, iterator) is True
+    assert iterator.calls == 1
+    assert loader._iterator is None
+    assert loader.iterator is None
+    assert _shutdown_loader(loader, iterator) is True
+    assert iterator.calls == 1
+
+
+def test_cleanup_failure_is_raised_and_other_loader_is_still_shutdown(monkeypatch):
+    from scripts.train.smoke_fusion_server import _cleanup_runtime_loaders
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    train_iterator = FakeWorkerIterator(RuntimeError("worker join failed"))
+    val_iterator = FakeWorkerIterator()
+    trainer = type("CleanupTrainer", (), {})()
+    trainer.train_loader = FakeWorkerLoader(train_iterator)
+    trainer.test_loader = FakeWorkerLoader(val_iterator)
+    trainer.validator = object()
+
+    with pytest.raises(RuntimeError, match="DataLoader cleanup failed for: train"):
+        _cleanup_runtime_loaders(trainer, train_iterator)
+    assert train_iterator.calls == 1
+    assert val_iterator.calls == 1
+    assert trainer.train_loader is None
+    assert trainer.test_loader is None
+    assert trainer.validator is None
 
 
 def _disabled_scaler():

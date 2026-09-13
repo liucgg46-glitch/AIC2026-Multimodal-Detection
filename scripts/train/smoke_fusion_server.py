@@ -2,6 +2,7 @@
 import argparse
 from copy import deepcopy
 from contextlib import nullcontext
+import gc
 import json
 import os
 from pathlib import Path
@@ -54,32 +55,115 @@ def _trainer_overrides(config, temporary_root, batch, imgsz):
     return overrides
 
 
+def _shutdown_loader(loader=None, iterator=None):
+    """Stop worker processes held by PyTorch or Ultralytics loader iterators."""
+    candidates = [iterator]
+    if loader is not None:
+        candidates.extend((getattr(loader, "_iterator", None), getattr(loader, "iterator", None)))
+    unique = []
+    seen = set()
+    for candidate in candidates:
+        if candidate is None or id(candidate) in seen:
+            continue
+        seen.add(id(candidate))
+        unique.append(candidate)
+
+    workers = int(getattr(loader, "num_workers", 0) or 0) if loader is not None else 0
+    shutdown_confirmed = bool(getattr(loader, "_f001_workers_shutdown", False))
+    for candidate in unique:
+        shutdown = getattr(candidate, "_shutdown_workers", None)
+        if not callable(shutdown):
+            continue
+        if not getattr(candidate, "_f001_workers_shutdown", False):
+            try:
+                shutdown()
+            except Exception as error:
+                raise RuntimeError("DataLoader worker shutdown failed") from error
+            try:
+                setattr(candidate, "_f001_workers_shutdown", True)
+            except (AttributeError, TypeError):
+                # PyTorch 2.4 iterators permit this marker; their shutdown method is also idempotent.
+                pass
+        shutdown_confirmed = True
+
+    if workers > 0 and not shutdown_confirmed:
+        raise RuntimeError("DataLoader has workers but exposes no shutdown-capable iterator")
+    if loader is not None:
+        try:
+            setattr(loader, "_f001_workers_shutdown", True)
+        except (AttributeError, TypeError):
+            pass
+        for attribute in ("_iterator", "iterator"):
+            if hasattr(loader, attribute):
+                try:
+                    setattr(loader, attribute, None)
+                except (AttributeError, TypeError):
+                    pass
+    return True
+
+
+def _cleanup_runtime_loaders(trainer, train_iter):
+    """Synchronize CUDA and close both formal loaders, reporting all cleanup failures."""
+    failures = []
+    if torch.cuda.is_available():
+        try:
+            torch.cuda.synchronize()
+        except Exception as error:
+            failures.append(("cuda_synchronize", error))
+    results = {}
+    for name, loader, iterator in (
+        ("train", getattr(trainer, "train_loader", None), train_iter),
+        ("val", getattr(trainer, "test_loader", None), None),
+    ):
+        try:
+            results[name] = _shutdown_loader(loader, iterator)
+        except Exception as error:
+            failures.append((name, error))
+            results[name] = False
+    trainer.train_loader = None
+    trainer.test_loader = None
+    trainer.validator = None
+    if failures:
+        names = ", ".join(name for name, _ in failures)
+        raise RuntimeError("DataLoader cleanup failed for: %s" % names) from failures[0][1]
+    return {
+        "dataloader_cleanup_passed": True,
+        "train_workers_shutdown": results["train"],
+        "val_workers_shutdown": results["val"],
+    }
+
+
 def _formal_validation_first_batch(trainer):
-    raw_batch = next(iter(trainer.test_loader))
-    if raw_batch["img"].shape[0] != trainer.test_loader.batch_size:
-        raise RuntimeError("Formal validation first batch did not reach the resolved batch size")
-    validator = trainer.validator
-    validator.device = trainer.device
-    use_amp = trainer.device.type != "cpu" and trainer.amp
-    model = trainer.ema.ema if trainer.ema is not None else trainer.model
-    model.eval()
-    if hasattr(validator.args, "quantize"):
-        # 8.4.144 keeps validation weights FP32 and enters autocast around inference.
-        validator.args.quantize = 16 if use_amp else None
-        model.float()
-        inference_context = autocast(use_amp, device=trainer.device.type)
-    else:
-        # 8.3.253 converts both the EMA model and input to FP16 during training validation.
-        validator.args.half = use_amp
-        model.half() if use_amp else model.float()
-        inference_context = nullcontext()
+    val_iter = iter(trainer.test_loader)
     try:
+        raw_batch = next(val_iter)
+        if raw_batch["img"].shape[0] != trainer.test_loader.batch_size:
+            raise RuntimeError("Formal validation first batch did not reach the resolved batch size")
+        validator = trainer.validator
+        validator.device = trainer.device
+        use_amp = trainer.device.type != "cpu" and trainer.amp
+        model = trainer.ema.ema if trainer.ema is not None else trainer.model
+        model.eval()
+        if hasattr(validator.args, "quantize"):
+            # 8.4.144 keeps validation weights FP32 and enters autocast around inference.
+            validator.args.quantize = 16 if use_amp else None
+            model.float()
+            inference_context = autocast(use_amp, device=trainer.device.type)
+        else:
+            # 8.3.253 converts both the EMA model and input to FP16 during training validation.
+            validator.args.half = use_amp
+            model.half() if use_amp else model.float()
+            inference_context = nullcontext()
         batch = validator.preprocess(raw_batch)
         with torch.inference_mode(), inference_context:
             predictions = model(batch["img"])
+        result = tuple(batch["img"].shape), type(predictions).__name__
     finally:
-        model.float()
-    return tuple(batch["img"].shape), type(predictions).__name__
+        if "model" in locals():
+            model.float()
+        _shutdown_loader(trainer.test_loader, val_iter)
+        del val_iter
+    return result
 
 
 def _optimizer_state_is_finite(optimizer):
@@ -283,7 +367,10 @@ def _save_and_reload_checkpoint(trainer, temporary_root, imgsz):
         args=val_args,
     )
     metrics = validator(model=str(checkpoint))
-    return checkpoint, restored_shape, metrics, len(one_loader.dataset), strip_report
+    result = checkpoint, restored_shape, metrics, len(one_loader.dataset), strip_report
+    _shutdown_loader(one_loader)
+    del validator, one_loader
+    return result
 
 
 def main():
@@ -300,8 +387,11 @@ def main():
     )
     requested_optimizer = config["train"]["optimizer"]
 
+    final_report = None
     with tempfile.TemporaryDirectory(prefix="f001-runtime-smoke-") as directory:
         original_cwd = Path.cwd()
+        trainer = None
+        train_iter = None
         try:
             # Upstream AMP checks may provision their own test asset; keep every such artifact temporary.
             os.chdir(directory)
@@ -351,9 +441,21 @@ def main():
                 "pretrained_ratios": trainer.model.load_report["ratios"],
                 "epoch_started": False,
             })
-            print(json.dumps(final_report, indent=2))
         finally:
-            os.chdir(str(original_cwd))
+            try:
+                if trainer is not None:
+                    cleanup_report = _cleanup_runtime_loaders(trainer, train_iter)
+                    if final_report is not None:
+                        final_report.update(cleanup_report)
+            finally:
+                train_iter = None
+                trainer = None
+                gc.collect()
+                torch.cuda.empty_cache()
+                os.chdir(str(original_cwd))
+    if final_report is None:
+        raise RuntimeError("Smoke completed without producing a final report")
+    print(json.dumps(final_report, indent=2))
     return 0
 
 
