@@ -96,3 +96,48 @@ def test_clean_contract_rejects_broken_manifest(tmp_path, monkeypatch):
     (staged / "manifest.json").write_text("{broken", encoding="utf-8")
     with pytest.raises(MODULE.TrainingConfigError, match="格式损坏"):
         MODULE.validate_clean_rgb_view(staged / "data.yaml")
+
+
+def test_custom_yaml_requires_hashed_explicit_initial_weights(tmp_path, monkeypatch):
+    monkeypatch.setattr(MODULE, "PROJECT_ROOT", tmp_path)
+    (tmp_path / "data.yaml").write_text("names: [person]\n", encoding="utf-8")
+    (tmp_path / "model.yaml").write_text("nc: 1\n", encoding="utf-8")
+    weights = tmp_path / "weights.pt"
+    weights.write_bytes(b"trusted fixture")
+    config = {
+        "experiment_id": "p2",
+        "model": "model.yaml",
+        "data": "data.yaml",
+        "pretrained": False,
+        "initial_weights": "weights.pt",
+        "initial_weights_sha256": MODULE.sha256(weights),
+        "initial_weights_policy": "ultralytics_shape_match",
+    }
+    path = tmp_path / "experiment.yaml"
+    path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    loaded = MODULE.load_config(path)
+    assert loaded["model"] == str(tmp_path / "model.yaml")
+    assert loaded["initial_weights"] == str(weights)
+    assert "initial_weights_sha256" not in loaded
+
+    config["initial_weights_sha256"] = "0" * 64
+    path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    with pytest.raises(MODULE.TrainingConfigError, match="SHA256"):
+        MODULE.load_config(path)
+
+
+def test_initial_weights_rejects_ambiguous_pretrained_flag(tmp_path, monkeypatch):
+    monkeypatch.setattr(MODULE, "PROJECT_ROOT", tmp_path)
+    (tmp_path / "data.yaml").write_text("names: [person]\n", encoding="utf-8")
+    (tmp_path / "model.yaml").write_text("nc: 1\n", encoding="utf-8")
+    weights = tmp_path / "weights.pt"
+    weights.write_bytes(b"fixture")
+    path = tmp_path / "experiment.yaml"
+    path.write_text(yaml.safe_dump({
+        "experiment_id": "p2", "model": "model.yaml", "data": "data.yaml",
+        "pretrained": True, "initial_weights": "weights.pt",
+        "initial_weights_sha256": MODULE.sha256(weights),
+        "initial_weights_policy": "ultralytics_shape_match",
+    }), encoding="utf-8")
+    with pytest.raises(MODULE.TrainingConfigError, match="pretrained: false"):
+        MODULE.load_config(path)

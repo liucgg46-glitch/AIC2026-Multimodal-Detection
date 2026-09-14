@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import torch
 import ultralytics
@@ -24,6 +24,8 @@ CANONICAL_LABELS_CLEAN_SHA256 = "6a670b95b33e803e5d25fc30d7bbd7985cbc4799234c37f
 RGB_CLEAN_CONTRACT = "rgb_labels_clean_v1"
 CANONICAL_TRAIN_COUNT = 1600
 CANONICAL_VAL_COUNT = 400
+P2_INITIALIZATION_POLICY = "yolo11_p2_semantic_v1"
+P2_LAYER_REMAP = {23: 17, 25: 19, 26: 20, 28: 22}
 
 
 class TrainingConfigError(ValueError):
@@ -46,6 +48,91 @@ def aggregate_labels(paths: List[Path]) -> Dict[str, object]:
         digest.update(f"{path.name}\0{size}\0{sha256(path)}\n".encode("utf-8"))
         total_bytes += size
     return {"aggregate_sha256": digest.hexdigest(), "file_count": len(paths), "total_bytes": total_bytes}
+
+
+def p2_source_key(target_key: str) -> Union[str, None]:
+    """Map a YOLO11-P2 target tensor to the semantically equivalent P3-P5 source tensor."""
+    parts = target_key.split(".")
+    if len(parts) < 3 or parts[0] != "model" or not parts[1].isdigit():
+        return None
+    layer = int(parts[1])
+    suffix = ".".join(parts[2:])
+    if layer <= 16:
+        return target_key
+    if layer in P2_LAYER_REMAP:
+        return "model.%d.%s" % (P2_LAYER_REMAP[layer], suffix)
+    if layer == 29 and suffix.startswith("cv2."):
+        branch_parts = suffix.split(".")
+        branch = int(branch_parts[1])
+        if 1 <= branch <= 3:
+            branch_parts[1] = str(branch - 1)
+            return "model.23." + ".".join(branch_parts)
+    if layer == 29 and suffix == "dfl.conv.weight":
+        return "model.23.dfl.conv.weight"
+    return None
+
+
+def build_p2_initial_state(
+    target: Dict[str, torch.Tensor], source: Dict[str, torch.Tensor]
+) -> Tuple[Dict[str, torch.Tensor], Dict[str, object]]:
+    selected: Dict[str, torch.Tensor] = {}
+    mappings: Dict[str, str] = {}
+    mismatches = []
+    for target_key, target_tensor in target.items():
+        source_key = p2_source_key(target_key)
+        if source_key is None or source_key not in source:
+            continue
+        if source[source_key].shape != target_tensor.shape:
+            mismatches.append({
+                "target": target_key,
+                "source": source_key,
+                "target_shape": list(target_tensor.shape),
+                "source_shape": list(source[source_key].shape),
+            })
+            continue
+        selected[target_key] = source[source_key]
+        mappings[target_key] = source_key
+
+    required_prefixes = tuple("model.%d." % layer for layer in range(17))
+    missing_required = [
+        key for key in target
+        if key.startswith(required_prefixes) and key not in selected
+    ]
+    if missing_required:
+        raise TrainingConfigError(
+            "P2 初始化未完整迁移 backbone/top-down P3: " + str(missing_required[:5])
+        )
+    loaded_numel = sum(tensor.numel() for tensor in selected.values())
+    target_numel = sum(tensor.numel() for tensor in target.values())
+    loaded_numel_ratio = loaded_numel / target_numel
+    report: Dict[str, object] = {
+        "policy": P2_INITIALIZATION_POLICY,
+        "loaded_tensors": len(selected),
+        "target_tensors": len(target),
+        "loaded_numel": loaded_numel,
+        "target_numel": target_numel,
+        "loaded_numel_ratio": loaded_numel_ratio,
+        "mappings": mappings,
+        "shape_mismatches": mismatches,
+        "random_target_prefixes": ["model.19.", "model.20.", "model.22.", "model.29.cv3."],
+    }
+    if loaded_numel_ratio < 0.95:
+        raise TrainingConfigError("P2 语义初始化参数覆盖率低于 95%")
+    return selected, report
+
+
+def initialize_p2_model(model: torch.nn.Module, checkpoint_path: Path) -> Dict[str, object]:
+    checkpoint = torch.load(str(checkpoint_path), map_location="cpu", weights_only=False)
+    source_model = checkpoint.get("ema") or checkpoint.get("model")
+    if source_model is None:
+        raise TrainingConfigError("初始化 checkpoint 缺少 model/ema")
+    selected, report = build_p2_initial_state(model.state_dict(), source_model.float().state_dict())
+    model.load_state_dict(selected, strict=False)
+    compact_report = {
+        key: value for key, value in report.items() if key != "mappings"
+    }
+    print("P2_INITIALIZATION_REPORT=" + json.dumps(compact_report, sort_keys=True))
+    return report
 
 
 def validate_clean_rgb_view(data_path: Path) -> None:
@@ -113,6 +200,9 @@ def load_config(path: Path) -> Dict[str, Any]:
 
     model = Path(str(config["model"]))
     pretrained = config.get("pretrained", True)
+    initial_weights = config.get("initial_weights")
+    initial_weights_sha256 = config.pop("initial_weights_sha256", None)
+    initial_weights_policy = config.get("initial_weights_policy")
     if model.suffix.lower() in {".yaml", ".yml"} and pretrained is True:
         raise TrainingConfigError(
             "model YAML + pretrained=true 不会自动加载 COCO 权重。"
@@ -133,6 +223,28 @@ def load_config(path: Path) -> Dict[str, Any]:
         raise TrainingConfigError(f"请先准备本地离线权重: {local_model}")
     if local_model.is_file():
         config["model"] = str(local_model)
+    if initial_weights is not None:
+        if model.suffix.lower() not in {".yaml", ".yml"}:
+            raise TrainingConfigError("initial_weights 只用于自定义 model YAML")
+        if pretrained is not False:
+            raise TrainingConfigError("使用 initial_weights 时必须显式设置 pretrained: false")
+        initial_path = project_path(initial_weights)
+        if not initial_path.is_file():
+            raise TrainingConfigError(f"初始化权重不存在: {initial_path}")
+        if not initial_weights_sha256:
+            raise TrainingConfigError("initial_weights 必须同时提供 initial_weights_sha256")
+        actual_sha256 = sha256(initial_path)
+        if actual_sha256.lower() != str(initial_weights_sha256).lower():
+            raise TrainingConfigError(
+                f"初始化权重 SHA256 不一致: {actual_sha256} != {initial_weights_sha256}"
+            )
+        config["initial_weights"] = str(initial_path)
+        if initial_weights_policy not in {"ultralytics_shape_match", P2_INITIALIZATION_POLICY}:
+            raise TrainingConfigError(f"未知 initial_weights_policy: {initial_weights_policy}")
+    elif initial_weights_sha256 is not None:
+        raise TrainingConfigError("initial_weights_sha256 缺少对应的 initial_weights")
+    elif initial_weights_policy is not None:
+        raise TrainingConfigError("initial_weights_policy 缺少对应的 initial_weights")
     return config
 
 
@@ -210,6 +322,8 @@ def main() -> int:
 
     mode_name = "formal" if args.train else "smoke" if args.smoke else "check-only"
     model_source = str(config.pop("model"))
+    initial_weights = config.pop("initial_weights", None)
+    initial_weights_policy = config.pop("initial_weights_policy", None)
     print(f"Experiment: {experiment_id}")
     print(f"Mode: {mode_name}")
     print(f"Git commit: {git_commit()}")
@@ -218,6 +332,9 @@ def main() -> int:
     print(f"Ultralytics: {ultralytics.__version__}")
     print(f"CUDA available: {torch.cuda.is_available()}")
     print(f"Model: {model_source}")
+    print(f"Initial weights: {initial_weights or 'embedded in model / none'}")
+    if initial_weights is not None:
+        print(f"Initial weights policy: {initial_weights_policy}")
     print(f"Data: {config['data']}")
 
     if not (args.train or args.smoke):
@@ -239,6 +356,11 @@ def main() -> int:
 
     started = time.perf_counter()
     model = YOLO(model_source)
+    if initial_weights is not None:
+        if initial_weights_policy == P2_INITIALIZATION_POLICY:
+            initialize_p2_model(model.model, Path(initial_weights))
+        else:
+            model.load(initial_weights)
     metrics = model.train(**config)
     elapsed = time.perf_counter() - started
 
