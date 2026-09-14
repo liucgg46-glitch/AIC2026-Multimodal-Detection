@@ -209,6 +209,9 @@ runs/**
 !runs/**/
 !runs/**/.gitkeep
 
+# Ultralytics may create a local settings directory when its global config is unavailable.
+Ultralytics/
+
 # Generated submissions and visualizations
 outputs/submissions/**
 !outputs/submissions/**/

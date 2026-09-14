@@ -50,9 +50,14 @@ def test_formal_cli_requires_expected_sha():
 
 def test_formal_cli_refuses_dirty_tree_before_trainer_creation():
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=str(ROOT), text=True).strip()
-    result = subprocess.run(
-        [sys.executable, "scripts/train/train_fusion.py", "--train", "--expected-sha", head],
-        cwd=str(ROOT), check=False, capture_output=True, text=True,
-    )
+    sentinel = ROOT / "formal_dirty_tree_test_sentinel.tmp"
+    sentinel.write_text("test-only dirty working tree\n", encoding="utf-8")
+    try:
+        result = subprocess.run(
+            [sys.executable, "scripts/train/train_fusion.py", "--train", "--expected-sha", head],
+            cwd=str(ROOT), check=False, capture_output=True, text=True,
+        )
+    finally:
+        sentinel.unlink(missing_ok=True)
     assert result.returncode != 0
     assert "Reviewed execution requires a clean working tree" in result.stderr
