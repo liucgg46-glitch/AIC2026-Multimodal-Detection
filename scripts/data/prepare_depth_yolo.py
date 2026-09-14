@@ -17,6 +17,11 @@ import cv2
 import numpy as np
 import yaml
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+from depth_preprocessing import read_image_unchanged
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CANONICAL_DEPTH_RELATIVE = Path("data/raw/train/depth")
@@ -361,7 +366,7 @@ def _set_mismatch_message(kind: str, expected: Set[str], actual: Set[str]) -> Op
 
 def validate_depth_encoding(path: Path) -> Dict[str, Any]:
     """Decode one source without losing its original bit depth and validate its branch."""
-    image = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+    image = read_image_unchanged(path)
     if image is None:
         raise DepthDatasetViewError(f"Depth 图像解码失败: {path}")
     suffix = path.suffix.lower()
@@ -545,7 +550,7 @@ def staged_image_name(source: Path) -> str:
 
 def convert_png_compat8(source: Path, destination: Path) -> None:
     """Apply the fixed C2 bit-depth compatibility conversion and lossless encoding."""
-    depth = cv2.imread(str(source), cv2.IMREAD_UNCHANGED)
+    depth = read_image_unchanged(source)
     if depth is None or depth.dtype != np.uint16 or depth.ndim != 2:
         raise DepthDatasetViewError(f"PNG Depth 转换前格式变化或解码失败: {source}")
     gray = np.right_shift(depth, 8).astype(np.uint8)

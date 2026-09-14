@@ -29,6 +29,12 @@ VALID_CANDIDATES = ("validmask", "percentile", "log", "inverse")
 QUANTILE_METHOD = "uint16_histogram_nearest_rank_1based_ceil"
 
 
+def read_image_unchanged(path):
+    """Decode original bit depth/shape, independent of Ultralytics' cv2.imread patch."""
+    encoded = np.frombuffer(Path(path).read_bytes(), dtype=np.uint8)
+    return cv2.imdecode(encoded, cv2.IMREAD_UNCHANGED) if encoded.size else None
+
+
 class DepthPreprocessingError(ValueError):
     """Raised when the C3 input or frozen preprocessing contract is invalid."""
 
@@ -145,7 +151,7 @@ def fit_train_png_percentiles(
     for path in paths:
         if path.suffix.lower() != ".png":
             raise DepthPreprocessingError(f"Percentile fit 只接受 train PNG，不接受: {path.name}")
-        depth = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+        depth = read_image_unchanged(path)
         if depth is None:
             raise DepthPreprocessingError(f"PNG Depth 解码失败: {path}")
         _validate_png_depth(depth)
