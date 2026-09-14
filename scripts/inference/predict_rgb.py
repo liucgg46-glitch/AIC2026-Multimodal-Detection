@@ -9,6 +9,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from typing import Dict, List, Set, Tuple, Union
 
 from ultralytics import YOLO
 
@@ -22,12 +23,12 @@ class InferenceError(ValueError):
     """Raised when inference inputs or predictions violate the submission contract."""
 
 
-def project_path(value: str | Path) -> Path:
+def project_path(value: Union[str, Path]) -> Path:
     path = Path(value).expanduser()
     return path.resolve() if path.is_absolute() else (PROJECT_ROOT / path).resolve()
 
 
-def discover_images(source: Path) -> list[Path]:
+def discover_images(source: Path) -> List[Path]:
     if not source.is_dir():
         raise InferenceError(f"RGB 测试图目录不存在: {source}")
     images = sorted(
@@ -37,7 +38,7 @@ def discover_images(source: Path) -> list[Path]:
     if not images:
         raise InferenceError(f"RGB 测试图目录中没有受支持的图像: {source}")
 
-    by_stem: dict[str, list[str]] = {}
+    by_stem: Dict[str, List[str]] = {}
     for image in images:
         by_stem.setdefault(image.stem, []).append(image.name)
     duplicate = next(((stem, names) for stem, names in by_stem.items() if len(names) > 1), None)
@@ -46,7 +47,7 @@ def discover_images(source: Path) -> list[Path]:
     return images
 
 
-def prediction_lines(result: object, max_det: int) -> list[str]:
+def prediction_lines(result: object, max_det: int) -> List[str]:
     boxes = result.boxes
     if boxes is None or len(boxes) == 0:
         return []
@@ -56,7 +57,7 @@ def prediction_lines(result: object, max_det: int) -> list[str]:
     xywhn = boxes.xywhn.detach().cpu().tolist()
     classes = boxes.cls.detach().cpu().tolist()
     confidences = boxes.conf.detach().cpu().tolist()
-    lines: list[str] = []
+    lines: List[str] = []
     for class_value, coordinates, confidence in zip(classes, xywhn, confidences):
         class_id = int(class_value)
         values = [*coordinates, confidence]
@@ -88,7 +89,7 @@ def run_inference(
     iou: float,
     max_det: int,
     force: bool,
-) -> tuple[int, int, float]:
+) -> Tuple[int, int, float]:
     if not 0.0 <= conf <= 1.0:
         raise InferenceError("--conf 必须位于 [0, 1]")
     if not 0.0 <= iou <= 1.0:
@@ -120,7 +121,7 @@ def run_inference(
             save_txt=False,
             verbose=False,
         )
-        seen: set[str] = set()
+        seen: Set[str] = set()
         prediction_count = 0
         for result in results:
             stem = Path(result.path).stem
@@ -162,7 +163,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", default="outputs/submissions/predictions")
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--imgsz", type=int, default=640)
-    parser.add_argument("--conf", type=float, default=0.25)
+    parser.add_argument("--conf", type=float, default=0.001,
+                        help="AP submission candidate threshold (not a display threshold)")
     parser.add_argument("--iou", type=float, default=0.7)
     parser.add_argument("--max-det", type=int, default=100)
     parser.add_argument("--force", action="store_true")
