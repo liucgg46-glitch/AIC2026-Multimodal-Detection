@@ -31,6 +31,16 @@ python -c "import torch, ultralytics; print(torch.__version__, ultralytics.__ver
 官方 `yolo11s.pt`，放到仓库忽略目录 `weights/yolo11s.pt`，记录 SHA-256。正式训练与推理
 不得依赖在线服务。
 
+先用固定默认参数重建可审计的 clean RGB 视图：
+
+```bash
+python scripts/train/prepare_rgb_yolo.py --link-mode hardlink --force
+```
+
+该命令固定读取 `data/raw/train/visible` 和 `data/processed/train/labels_clean`，输出到
+`data/processed/rgb_yolo_clean` 并生成包含标签聚合 SHA-256 的 `manifest.json`。后续训练入口
+会重新计算 canonical 与 staged 标签哈希，目录名或 YAML 路径本身不能冒充 clean 数据。
+
 ## 检查与 smoke
 
 ```bash

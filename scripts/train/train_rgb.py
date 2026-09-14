@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Dict, List, Union
 
 import torch
 import ultralytics
@@ -16,10 +18,71 @@ from ultralytics import YOLO
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+RGB_CLEAN_DATA = Path("data/processed/rgb_yolo_clean/data.yaml")
+CANONICAL_LABELS = Path("data/processed/train/labels_clean")
+CANONICAL_LABELS_CLEAN_SHA256 = "6a670b95b33e803e5d25fc30d7bbd7985cbc4799234c37ff42b3b1c9204025a4"
+RGB_CLEAN_CONTRACT = "rgb_labels_clean_v1"
+CANONICAL_TRAIN_COUNT = 1600
+CANONICAL_VAL_COUNT = 400
 
 
 class TrainingConfigError(ValueError):
     """Raised when an experiment configuration cannot be used safely."""
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def aggregate_labels(paths: List[Path]) -> Dict[str, object]:
+    digest = hashlib.sha256()
+    total_bytes = 0
+    for path in sorted(paths, key=lambda item: (item.name.casefold(), item.name)):
+        size = path.stat().st_size
+        digest.update(f"{path.name}\0{size}\0{sha256(path)}\n".encode("utf-8"))
+        total_bytes += size
+    return {"aggregate_sha256": digest.hexdigest(), "file_count": len(paths), "total_bytes": total_bytes}
+
+
+def validate_clean_rgb_view(data_path: Path) -> None:
+    expected = (PROJECT_ROOT / RGB_CLEAN_DATA).resolve()
+    if data_path.resolve() != expected:
+        raise TrainingConfigError(f"clean RGB contract 要求 data: {RGB_CLEAN_DATA.as_posix()}")
+    manifest_path = data_path.parent / "manifest.json"
+    if not manifest_path.is_file():
+        raise TrainingConfigError("clean RGB view 缺少 manifest.json；请重新生成")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise TrainingConfigError("clean RGB manifest.json 无法读取或格式损坏") from exc
+    if (manifest.get("representation") != "rgb_byte_preserving_clean_labels"
+            or manifest.get("train_count") != CANONICAL_TRAIN_COUNT
+            or manifest.get("val_count") != CANONICAL_VAL_COUNT):
+        raise TrainingConfigError("clean RGB manifest contract 不一致")
+
+    train_stems = [line.strip() for line in (PROJECT_ROOT / "data/splits/train.txt").read_text(
+        encoding="utf-8-sig").splitlines() if line.strip()]
+    val_stems = [line.strip() for line in (PROJECT_ROOT / "data/splits/val.txt").read_text(
+        encoding="utf-8-sig").splitlines() if line.strip()]
+    if (len(train_stems) != CANONICAL_TRAIN_COUNT
+            or len(val_stems) != CANONICAL_VAL_COUNT
+            or set(train_stems) & set(val_stems)):
+        raise TrainingConfigError("clean RGB contract 要求固定且无重叠的 1600/400 split")
+    canonical = [PROJECT_ROOT / CANONICAL_LABELS / (stem + ".txt") for stem in train_stems + val_stems]
+    staged = ([data_path.parent / "labels/train" / (stem + ".txt") for stem in train_stems]
+              + [data_path.parent / "labels/val" / (stem + ".txt") for stem in val_stems])
+    if any(not path.is_file() for path in canonical + staged):
+        raise TrainingConfigError("clean RGB view 或 canonical labels_clean 文件缺失")
+    canonical_identity = aggregate_labels(canonical)
+    staged_identity = aggregate_labels(staged)
+    if canonical_identity["aggregate_sha256"] != CANONICAL_LABELS_CLEAN_SHA256:
+        raise TrainingConfigError("canonical labels_clean SHA256 不一致")
+    if staged_identity != canonical_identity or manifest.get("labels_identity") != canonical_identity:
+        raise TrainingConfigError("clean RGB view 标签与 canonical labels_clean 不一致")
 
 
 def project_path(value: Union[str, Path]) -> Path:
@@ -38,6 +101,7 @@ def load_config(path: Path) -> Dict[str, Any]:
     if missing:
         raise TrainingConfigError(f"实验配置缺少必要字段: {missing}")
 
+    data_contract = config.pop("data_contract", None)
     data_path = project_path(config["data"])
     if not data_path.is_file():
         raise TrainingConfigError(
@@ -55,6 +119,10 @@ def load_config(path: Path) -> Dict[str, Any]:
             "请使用 model: weights/yolo11n.pt，或明确指定 pretrained 权重路径；"
             "从零训练请显式设置 pretrained: false。"
         )
+    if data_contract is not None:
+        if data_contract != RGB_CLEAN_CONTRACT:
+            raise TrainingConfigError(f"未知 data_contract: {data_contract}")
+        validate_clean_rgb_view(data_path)
     if isinstance(pretrained, str):
         pretrained_path = project_path(pretrained)
         if not pretrained_path.is_file():

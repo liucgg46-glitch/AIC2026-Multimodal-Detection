@@ -1,7 +1,8 @@
 # Proposed controlled experiment; server GPU smoke required before freezing.
 experiment_id: AUDIT_S640
 model: weights/yolo11s.pt
-data: data/processed/rgb_yolo/data.yaml
+data: data/processed/rgb_yolo_clean/data.yaml
+data_contract: rgb_labels_clean_v1
 epochs: 200
 patience: 60
 imgsz: 640
