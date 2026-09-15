@@ -8,6 +8,7 @@ from ultralytics.nn.tasks import DetectionModel
 from scripts.inference.predict_quality_fusion import (
     detection_lines, paired_test_records, prepare_image, resolve_device, run_prediction,
 )
+from scripts.analysis.audit_f002_quality import validate_mode
 from src.fusion.quality_dataset import QualityTriModalDataset, decode_depth, edge_dark_valid_region
 from src.fusion.quality_model import QualityTriModalModel, QualityResidual
 
@@ -168,3 +169,51 @@ def test_prediction_device_zero_means_first_cuda_device_and_cpu_stays_cpu():
         import pytest
         with pytest.raises(RuntimeError, match="CUDA was requested"):
             resolve_device("0")
+
+
+def test_rectangular_validation_groups_aspect_ratios_and_keeps_ratio_metadata(tmp_path):
+    records = []
+    for index, shape in enumerate(((64, 128), (128, 64))):
+        directory = tmp_path / str(index)
+        directory.mkdir()
+        record = write_record(directory, ".png")
+        for path in record[1:4]:
+            image = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+            resized = cv2.resize(image, shape[::-1], interpolation=cv2.INTER_NEAREST)
+            assert cv2.imwrite(str(path), resized)
+        records.append(record)
+    dataset = QualityTriModalDataset(records, 128, make_hyp(), augment=False,
+                                    rect_batch_size=1)
+    assert dataset.rect
+    first, second = dataset[0], dataset[1]
+    assert first["img"].shape[1:] == (96, 160)
+    assert second["img"].shape[1:] == (160, 96)
+    assert first["ratio_pad"][0] == (1.0, 1.0)
+    assert second["ratio_pad"][0] == (1.0, 1.0)
+
+
+def test_audit_ablation_changes_only_the_requested_modality():
+    class Validator:
+        def preprocess(self, batch):
+            return batch
+
+        def __call__(self, trainer):
+            self.observed = self.preprocess({"img": torch.ones(1, 11, 32, 32)})["img"]
+            return {"metrics/mAP50(B)": 0.5, "metrics/mAP50-95(B)": 0.3,
+                    "metrics/precision(B)": 0.6, "metrics/recall(B)": 0.4}
+
+    class Trainer:
+        def get_validator(self):
+            self.validator = Validator()
+            return self.validator
+
+    trainer = Trainer()
+    loader = SimpleNamespace(dataset=[None])
+    validate_mode(trainer, loader, "IR_OFF")
+    assert trainer.validator.observed[:, 3:6].count_nonzero() == 0
+    assert trainer.validator.observed[:, 9].count_nonzero() == 0
+    assert trainer.validator.observed[:, 6:9].min() == 1
+    validate_mode(trainer, loader, "DEPTH_OFF")
+    assert trainer.validator.observed[:, 6:9].count_nonzero() == 0
+    assert trainer.validator.observed[:, 3:6].min() == 1
+    assert trainer.validator.observed[:, 9].min() == 1

@@ -110,11 +110,14 @@ class QualityTriModalDataset(Dataset):
     rect = False
     mosaic = False
 
-    def __init__(self, records, imgsz, hyp, augment=False, dropout_probability=0.2):
+    def __init__(self, records, imgsz, hyp, augment=False, dropout_probability=0.2,
+                 rect_batch_size=None):
         if imgsz < 32 or imgsz % 32:
             raise ValueError("imgsz must be a multiple of 32")
         if not 0 <= dropout_probability < 1:
             raise ValueError("invalid modality dropout probability")
+        if rect_batch_size is not None and (augment or rect_batch_size < 1):
+            raise ValueError("Rectangular batching is validation-only with a positive batch size")
         if any(getattr(hyp, key, 0) for key in (
             "mosaic", "mixup", "cutmix", "copy_paste", "degrees", "shear", "perspective",
             "multi_scale", "bgr", "flipud",
@@ -143,6 +146,28 @@ class QualityTriModalDataset(Dataset):
             self.labels.append(dict(im_file=str(rgb_path), shape=rgb.shape[:2],
                                     cls=boxes[:, :1], bboxes=boxes[:, 1:]))
 
+        if rect_batch_size is not None:
+            self.rect = True
+            ratios = np.asarray([row["shape"][0] / row["shape"][1] for row in self.labels])
+            order = np.argsort(ratios)
+            self.records = [self.records[index] for index in order]
+            self.im_files = [self.im_files[index] for index in order]
+            self.labels = [self.labels[index] for index in order]
+            ratios = ratios[order]
+            groups = np.floor(np.arange(len(self.records)) / rect_batch_size).astype(int)
+            shapes = np.ones((groups[-1] + 1, 2), dtype=np.float32)
+            for group in range(len(shapes)):
+                subset = ratios[groups == group]
+                minimum, maximum = subset.min(), subset.max()
+                if maximum < 1:
+                    shapes[group] = [maximum, 1]
+                elif minimum > 1:
+                    shapes[group] = [1, 1 / minimum]
+            self.batch_shapes = np.ceil(shapes * imgsz / 32 + 0.5).astype(int) * 32
+            self.batch = groups
+        else:
+            self.rect = False
+
         transforms = [PairedLetterBox((imgsz, imgsz), scaleup=augment)]
         if augment:
             transforms += [
@@ -167,6 +192,8 @@ class QualityTriModalDataset(Dataset):
         label.update(img=image, ori_shape=rgb.shape[:2], ratio_pad=(1.0, 1.0),
                      instances=Instances(boxes, np.zeros((0, 1000, 2), dtype=np.float32),
                                          bbox_format="xywh", normalized=True))
+        if self.rect:
+            label["rect_shape"] = tuple(self.batch_shapes[self.batch[index]])
         sample = self.transforms(label)
         sample["img"][10].fill_(255 if jpg else 0)  # format is an image-level token
         if self.augment:

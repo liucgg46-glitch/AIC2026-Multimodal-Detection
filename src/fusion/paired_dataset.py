@@ -92,7 +92,8 @@ class PairedLetterBox(LetterBox):
         # 8.3.253 only appends pad to ratio_pad; 8.4.144 also multiplies resize gain.
         # Our pipeline has no preceding resize. Normalize metadata for BOTH versions.
         h, w = labels["img"].shape[:2]
-        gain = min(self.new_shape[0] / h, self.new_shape[1] / w)
+        target_shape = labels.get("rect_shape", self.new_shape)
+        gain = min(target_shape[0] / h, target_shape[1] / w)
         if not self.scaleup:
             gain = min(gain, 1.0)
         result = super().__call__(labels)
