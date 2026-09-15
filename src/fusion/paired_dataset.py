@@ -90,14 +90,15 @@ class PairedFormat(Format):
 class PairedLetterBox(LetterBox):
     def __call__(self, labels):
         # 8.3.253 only appends pad to ratio_pad; 8.4.144 also multiplies resize gain.
-        # Our pipeline has no preceding resize. Normalize metadata for BOTH versions.
+        # Normalize metadata for both versions, including a preceding YOLO-style resize.
         h, w = labels["img"].shape[:2]
         target_shape = labels.get("rect_shape", self.new_shape)
         gain = min(target_shape[0] / h, target_shape[1] / w)
         if not self.scaleup:
             gain = min(gain, 1.0)
+        prior = labels.get("ratio_pad", (1.0, 1.0))
         result = super().__call__(labels)
-        result["ratio_pad"] = ((gain, gain), result["ratio_pad"][1])
+        result["ratio_pad"] = ((prior[0] * gain, prior[1] * gain), result["ratio_pad"][1])
         return result
 
 

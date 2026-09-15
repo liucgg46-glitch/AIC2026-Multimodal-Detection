@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import math
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -98,6 +99,18 @@ def edge_dark_valid_region(image: np.ndarray) -> np.ndarray:
     return (~invalid).astype(np.uint8) * 255
 
 
+def resize_like_yolo(image: np.ndarray, imgsz: int) -> Tuple[np.ndarray, Tuple[float, float]]:
+    """Replicate BaseDataset.load_image's long-side resize before validation LetterBox."""
+    original_h, original_w = image.shape[:2]
+    ratio = imgsz / max(original_h, original_w)
+    if ratio != 1:
+        width = min(math.ceil(original_w * ratio), imgsz)
+        height = min(math.ceil(original_h * ratio), imgsz)
+        image = cv2.resize(image, (width, height), interpolation=cv2.INTER_LINEAR)
+    resized_h, resized_w = image.shape[:2]
+    return np.ascontiguousarray(image), (resized_h / original_h, resized_w / original_w)
+
+
 class TriModalFormat(Format):
     def __call__(self, labels):
         image = labels["img"]
@@ -111,7 +124,7 @@ class QualityTriModalDataset(Dataset):
     mosaic = False
 
     def __init__(self, records, imgsz, hyp, augment=False, dropout_probability=0.2,
-                 rect_batch_size=None):
+                 rect_batch_size=None, rgb_protocol_resize=False):
         if imgsz < 32 or imgsz % 32:
             raise ValueError("imgsz must be a multiple of 32")
         if not 0 <= dropout_probability < 1:
@@ -127,6 +140,7 @@ class QualityTriModalDataset(Dataset):
         self.imgsz = imgsz
         self.augment = augment
         self.dropout_probability = dropout_probability
+        self.rgb_protocol_resize = rgb_protocol_resize
         self.im_files = [str(row[1]) for row in records]
         self.labels: List[Dict[str, object]] = []
         for stem, rgb_path, ir_path, depth_path, label_path in records:
@@ -186,10 +200,13 @@ class QualityTriModalDataset(Dataset):
         rgb, ir = read_raw3(rgb_path), read_raw3(ir_path)
         encoded, jpg = decode_depth(depth_path, rgb.shape[:2])
         image = encode_transport(rgb, ir, encoded, jpg)
+        ratio_pad = (1.0, 1.0)
+        if self.rgb_protocol_resize:
+            image, ratio_pad = resize_like_yolo(image, self.imgsz)
         label = deepcopy(self.labels[index])
         label.pop("shape")
         boxes = label.pop("bboxes")
-        label.update(img=image, ori_shape=rgb.shape[:2], ratio_pad=(1.0, 1.0),
+        label.update(img=image, ori_shape=rgb.shape[:2], ratio_pad=ratio_pad,
                      instances=Instances(boxes, np.zeros((0, 1000, 2), dtype=np.float32),
                                          bbox_format="xywh", normalized=True))
         if self.rect:

@@ -4,6 +4,8 @@ import cv2
 import numpy as np
 import torch
 from ultralytics.nn.tasks import DetectionModel
+from ultralytics.cfg import get_cfg
+from ultralytics.data.dataset import YOLODataset
 
 from scripts.inference.predict_quality_fusion import (
     detection_lines, paired_test_records, prepare_image, resolve_device, run_prediction,
@@ -218,3 +220,38 @@ def test_audit_ablation_changes_only_the_requested_modality():
     assert trainer.validator.observed[:, 6:9].count_nonzero() == 0
     assert trainer.validator.observed[:, 3:6].min() == 1
     assert trainer.validator.observed[:, 9].min() == 1
+
+
+def test_rgb_protocol_resize_matches_ultralytics_val_rgb_pixels(tmp_path):
+    record = write_record(tmp_path, ".jpg")
+    for path in record[1:4]:
+        original = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+        assert cv2.imwrite(str(path), cv2.resize(original, (96, 64)))
+    image_dir = tmp_path / "yolo" / "images" / "val"
+    label_dir = tmp_path / "yolo" / "labels" / "val"
+    image_dir.mkdir(parents=True)
+    label_dir.mkdir(parents=True)
+    (image_dir / record[1].name).write_bytes(record[1].read_bytes())
+    (label_dir / (record[1].stem + ".txt")).write_bytes(record[4].read_bytes())
+    reference = YOLODataset(
+        img_path=str(image_dir), imgsz=128, cache=False, augment=False,
+        hyp=get_cfg(), rect=False, batch_size=1, stride=32,
+        data={"channels": 3, "names": {0: "person"}},
+    )[0]
+    legacy = QualityTriModalDataset([record], 128, make_hyp(), augment=False)[0]
+    corrected = QualityTriModalDataset([record], 128, make_hyp(), augment=False,
+                                       rgb_protocol_resize=True)[0]
+    assert not torch.equal(legacy["img"][:3], reference["img"])
+    assert torch.equal(corrected["img"][:3], reference["img"])
+    assert corrected["ratio_pad"] == reference["ratio_pad"]
+    reference_rect = YOLODataset(
+        img_path=str(image_dir), imgsz=128, cache=False, augment=False,
+        hyp=get_cfg(), rect=True, batch_size=1, stride=32,
+        data={"channels": 3, "names": {0: "person"}},
+    )[0]
+    corrected_rect = QualityTriModalDataset(
+        [record], 128, make_hyp(), augment=False, rect_batch_size=1,
+        rgb_protocol_resize=True,
+    )[0]
+    assert torch.equal(corrected_rect["img"][:3], reference_rect["img"])
+    assert corrected_rect["ratio_pad"] == reference_rect["ratio_pad"]

@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 import torch
+from ultralytics.cfg import get_cfg
 from ultralytics.data import build_dataloader
 
 from scripts.train.train_quality_fusion import DEFAULT_CONFIG, load_config
@@ -23,13 +24,14 @@ from src.fusion.quality_trainer import QualityFusionTrainer
 M960_RECT_VAL_BATCH = 16  # RGB_R2_M960 formal log validates val400 in 25 batches
 
 
-def val_loader(trainer, rectangle):
-    if not rectangle:
+def val_loader(trainer, rectangle, rgb_protocol_resize=False):
+    if not rectangle and not rgb_protocol_resize:
         return trainer.test_loader
-    batch = M960_RECT_VAL_BATCH
+    batch = M960_RECT_VAL_BATCH if rectangle else trainer.test_loader.batch_size
     dataset = QualityTriModalDataset(
         trainer.tri_records["val"], trainer.args.imgsz, trainer.args,
-        augment=False, rect_batch_size=batch,
+        augment=False, rect_batch_size=batch if rectangle else None,
+        rgb_protocol_resize=rgb_protocol_resize,
     )
     return build_dataloader(dataset, batch=batch, workers=0, shuffle=False, rank=-1)
 
@@ -60,7 +62,17 @@ def validate_mode(trainer, loader, mode):
     }
 
 
+def persist_report(path, report):
+    staged = path.with_name("." + path.name + ".tmp")
+    staged.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    staged.replace(path)
+
+
 def audit(config_path, best_path, expected_best_sha256, output):
+    output = Path(output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    if output.exists():
+        raise FileExistsError("Audit output already exists: " + str(output))
     config = load_config(config_path)
     overrides = dict(config["train"])
     overrides.update(
@@ -73,19 +85,26 @@ def audit(config_path, best_path, expected_best_sha256, output):
     trainer._setup_train()  # initialize the actual trainer model and full val loaders; no train step
     trainer.loss_items = torch.zeros(3, device=trainer.device)
     trainer.epoch = 0
-    rectangle = val_loader(trainer, True)
-    square = val_loader(trainer, False)
+    loaders = {
+        "legacy_square": val_loader(trainer, False),
+        "legacy_rectangle": val_loader(trainer, True),
+        "rgb_square": val_loader(trainer, False, rgb_protocol_resize=True),
+        "rgb_rectangle": val_loader(trainer, True, rgb_protocol_resize=True),
+    }
     report = {
         "source_m960_sha256": config["initial_checkpoint_sha256"],
         "best_pt_sha256": None,
         "baseline_m960_original_reval_map5095": 0.47901307551468025,
+        "baseline_m960_training_history_best_map5095": 0.47923,
         "square_val_batch": trainer.test_loader.batch_size,
         "rectangle_val_batch": M960_RECT_VAL_BATCH,
+        "completed": False,
         "results": {},
     }
-    for geometry, loader in (("square", square), ("rectangle", rectangle)):
+    for geometry, loader in loaders.items():
         key = "M960_INIT_" + geometry
         report["results"][key] = validate_mode(trainer, loader, "BOTH_OFF")
+        persist_report(output, report)
         print("AUDIT_F002_RESULT=" + json.dumps({key: report["results"][key]}, sort_keys=True))
 
     if best_path is not None:
@@ -97,19 +116,25 @@ def audit(config_path, best_path, expected_best_sha256, output):
         model = checkpoint.get("ema") or checkpoint.get("model")
         if not isinstance(model, QualityTriModalModel):
             raise ValueError("F002 best.pt does not contain QualityTriModalModel")
+        if isinstance(model.args, dict):
+            model.args = get_cfg(overrides=model.args)  # restore .box/.cls/.dfl for training-mode loss
         trainer.ema.ema = model.float().to(trainer.device).eval()
         report["best_pt_sha256"] = digest
-        for geometry, loader in (("square", square), ("rectangle", rectangle)):
-            for mode in ("NORMAL", "BOTH_OFF", "IR_OFF", "DEPTH_OFF"):
+        best_modes = {
+            "legacy_square": ("NORMAL", "BOTH_OFF"),
+            "rgb_square": ("NORMAL",),
+            "rgb_rectangle": ("NORMAL", "BOTH_OFF", "IR_OFF", "DEPTH_OFF"),
+        }
+        for geometry, modes in best_modes.items():
+            loader = loaders[geometry]
+            for mode in modes:
                 key = "F002_BEST_" + geometry + "_" + mode
                 report["results"][key] = validate_mode(trainer, loader, mode)
+                persist_report(output, report)
                 print("AUDIT_F002_RESULT=" + json.dumps({key: report["results"][key]}, sort_keys=True))
 
-    output = Path(output)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    if output.exists():
-        raise FileExistsError("Audit output already exists: " + str(output))
-    output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    report["completed"] = True
+    persist_report(output, report)
     print("AUDIT_F002_COMPLETE=" + str(output))
     return report
 
