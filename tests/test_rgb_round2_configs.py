@@ -54,3 +54,12 @@ def test_p2_semantic_initialization_maps_old_p3_p4_p5_and_leaves_p2_random():
     assert torch.equal(after["model.29.dfl.conv.weight"], source.state_dict()["model.23.dfl.conv.weight"])
     assert torch.equal(after["model.19.cv1.conv.weight"], before["model.19.cv1.conv.weight"])
     assert torch.equal(after["model.29.cv3.0.2.weight"], before["model.29.cv3.0.2.weight"])
+
+
+def test_fixed_p2_retry_keeps_the_formal_config_except_run_identity():
+    original = read_config("RGB_R2_S960_P2.yaml")
+    retry = read_config("RGB_R3_S960_P2_FIXED_INIT.yaml")
+    for key, value in original.items():
+        if key not in {"experiment_id", "name"}:
+            assert retry[key] == value, key
+    assert retry["experiment_id"] == retry["name"] == "RGB_R3_S960_P2_FIXED_INIT"

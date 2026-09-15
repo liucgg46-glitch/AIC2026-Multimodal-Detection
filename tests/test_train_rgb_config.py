@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 import subprocess
+import torch
 
 SPEC = importlib.util.spec_from_file_location(
     "train_rgb_config", Path(__file__).resolve().parents[1] / "scripts/train/train_rgb.py")
@@ -141,3 +142,43 @@ def test_initial_weights_rejects_ambiguous_pretrained_flag(tmp_path, monkeypatch
     }), encoding="utf-8")
     with pytest.raises(MODULE.TrainingConfigError, match="pretrained: false"):
         MODULE.load_config(path)
+
+
+def test_initial_weights_are_applied_to_trainer_created_model(tmp_path, monkeypatch):
+    checkpoint = tmp_path / "best.pt"
+    checkpoint.write_bytes(b"fixture")
+    fresh = torch.nn.Linear(1, 1, bias=False)
+    preview = torch.nn.Linear(1, 1, bias=False)
+    with torch.no_grad():
+        fresh.weight.fill_(0)
+        preview.weight.fill_(0)
+
+    def fresh_model(self, cfg=None, weights=None, verbose=True):
+        assert weights is None
+        return fresh
+
+    def apply_initial_weights(model, path):
+        assert model is fresh
+        assert path == checkpoint
+        with torch.no_grad():
+            model.weight.fill_(7)
+        return {"loaded_numel_ratio": 0.965}
+
+    monkeypatch.setattr(MODULE.DetectionTrainer, "get_model", fresh_model)
+    monkeypatch.setattr(MODULE, "initialize_p2_model", apply_initial_weights)
+    trainer_type = MODULE.build_initializing_trainer(checkpoint, MODULE.P2_INITIALIZATION_POLICY)
+    trainer = trainer_type.__new__(trainer_type)
+    actual = trainer.get_model(cfg="model.yaml", weights=None, verbose=False)
+
+    assert actual is fresh
+    assert fresh.weight.item() == 7
+    assert preview.weight.item() == 0
+
+
+def test_initializing_trainer_rejects_competing_trainer_weights(tmp_path, monkeypatch):
+    checkpoint = tmp_path / "best.pt"
+    checkpoint.write_bytes(b"fixture")
+    trainer_type = MODULE.build_initializing_trainer(checkpoint, MODULE.P2_INITIALIZATION_POLICY)
+    trainer = trainer_type.__new__(trainer_type)
+    with pytest.raises(MODULE.TrainingConfigError, match="同时"):
+        trainer.get_model(weights=object())

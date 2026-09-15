@@ -15,6 +15,7 @@ import torch
 import ultralytics
 import yaml
 from ultralytics import YOLO
+from ultralytics.models.yolo.detect import DetectionTrainer
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -133,6 +134,29 @@ def initialize_p2_model(model: torch.nn.Module, checkpoint_path: Path) -> Dict[s
     }
     print("P2_INITIALIZATION_REPORT=" + json.dumps(compact_report, sort_keys=True))
     return report
+
+
+def build_initializing_trainer(checkpoint_path: Path, policy: str):
+    """Initialize the model created by YOLO.train(), not its discarded YAML preview."""
+    class InitializingDetectionTrainer(DetectionTrainer):
+        def get_model(self, cfg=None, weights=None, verbose=True):
+            if weights is not None:
+                raise TrainingConfigError("自定义 YAML 初始化不应同时收到 trainer weights")
+            model = super().get_model(cfg=cfg, weights=weights, verbose=verbose)
+            if policy == P2_INITIALIZATION_POLICY:
+                initialize_p2_model(model, checkpoint_path)
+            elif policy == "ultralytics_shape_match":
+                checkpoint = torch.load(str(checkpoint_path), map_location="cpu", weights_only=False)
+                source_model = checkpoint.get("ema") or checkpoint.get("model")
+                if source_model is None:
+                    raise TrainingConfigError("初始化 checkpoint 缺少 model/ema")
+                model.load(source_model)
+                print("INITIAL_WEIGHTS_APPLIED_IN_TRAINER=" + str(checkpoint_path))
+            else:
+                raise TrainingConfigError("未知 initial_weights_policy: " + str(policy))
+            return model
+
+    return InitializingDetectionTrainer
 
 
 def validate_clean_rgb_view(data_path: Path) -> None:
@@ -357,11 +381,10 @@ def main() -> int:
     started = time.perf_counter()
     model = YOLO(model_source)
     if initial_weights is not None:
-        if initial_weights_policy == P2_INITIALIZATION_POLICY:
-            initialize_p2_model(model.model, Path(initial_weights))
-        else:
-            model.load(initial_weights)
-    metrics = model.train(**config)
+        trainer = build_initializing_trainer(Path(initial_weights), initial_weights_policy)
+        metrics = model.train(trainer=trainer, **config)
+    else:
+        metrics = model.train(**config)
     elapsed = time.perf_counter() - started
 
     save_dir = Path(model.trainer.save_dir).resolve()
