@@ -6,6 +6,7 @@ import torch
 from ultralytics.nn.tasks import DetectionModel
 from ultralytics.cfg import get_cfg
 from ultralytics.data.dataset import YOLODataset
+from ultralytics.data.augment import LetterBox
 
 from scripts.inference.predict_quality_fusion import (
     detection_lines, paired_test_records, prepare_image, resolve_device, run_prediction,
@@ -161,6 +162,32 @@ def test_quality_prediction_writes_exact_stem_zip_and_valid_six_column_rows(tmp_
     detection = torch.tensor([[16., 16., 48., 48., 0.8, 2.]])
     rows = detection_lines(detection, (64, 64))
     assert rows == ["2 0.50000000 0.50000000 0.50000000 0.50000000 0.80000001"]
+
+
+def test_prediction_auto_rect_matches_ultralytics_letterbox_and_box_scaling(tmp_path):
+    record = write_record(tmp_path, ".png")
+    for path in record[1:4]:
+        raw = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+        assert cv2.imwrite(str(path), cv2.resize(raw, (96, 64)))
+    image, original_shape, ratio_pad = prepare_image(
+        *record[1:4], imgsz=128, letterbox_mode="auto_rect"
+    )
+    rgb = cv2.imread(str(record[1]), cv2.IMREAD_COLOR)
+    expected = LetterBox((128, 128), auto=True, stride=32, scaleup=True)(image=rgb)
+    assert image.shape[1:] == expected.shape[:2]
+    assert torch.equal(torch.from_numpy(image[:3]),
+                       torch.from_numpy(expected[..., ::-1].transpose(2, 0, 1).copy()))
+    from ultralytics.utils.ops import scale_boxes
+    gain, padding = ratio_pad
+    boxes = torch.tensor([[12. * gain[0] + padding[0],
+                           12. * gain[1] + padding[1],
+                           72. * gain[0] + padding[0],
+                           48. * gain[1] + padding[1]]])
+    restored = scale_boxes(image.shape[1:], boxes.clone(), original_shape,
+                           ratio_pad=ratio_pad)
+    assert torch.allclose(restored, torch.tensor([[12., 12., 72., 48.]]), atol=1e-4)
+    square, _, _ = prepare_image(*record[1:4], imgsz=128, letterbox_mode="square")
+    assert square.shape == (11, 128, 128)
 
 
 def test_prediction_device_zero_means_first_cuda_device_and_cpu_stays_cpu():

@@ -1,4 +1,4 @@
-"""Run a configuration-driven Ultralytics RGB training experiment."""
+"""Run a configuration-driven Ultralytics single-modality detection experiment."""
 
 from __future__ import annotations
 
@@ -23,6 +23,8 @@ RGB_CLEAN_DATA = Path("data/processed/rgb_yolo_clean/data.yaml")
 CANONICAL_LABELS = Path("data/processed/train/labels_clean")
 CANONICAL_LABELS_CLEAN_SHA256 = "6a670b95b33e803e5d25fc30d7bbd7985cbc4799234c37ff42b3b1c9204025a4"
 RGB_CLEAN_CONTRACT = "rgb_labels_clean_v1"
+IR_RAW3_CLEAN_CONTRACT = "ir_raw3_labels_clean_v1"
+DEPTH_LOG_CLEAN_CONTRACT = "depth_log_labels_clean_v1"
 CANONICAL_TRAIN_COUNT = 1600
 CANONICAL_VAL_COUNT = 400
 P2_INITIALIZATION_POLICY = "yolo11_p2_semantic_v1"
@@ -196,6 +198,51 @@ def validate_clean_rgb_view(data_path: Path) -> None:
         raise TrainingConfigError("clean RGB view 标签与 canonical labels_clean 不一致")
 
 
+def validate_clean_modality_view(data_path: Path, contract: str) -> None:
+    views = {
+        IR_RAW3_CLEAN_CONTRACT: (Path("data/processed/ir_trainable/raw3/data.yaml"), "raw3"),
+        DEPTH_LOG_CLEAN_CONTRACT: (Path("data/processed/depth_trainable/log/data.yaml"), "log"),
+    }
+    expected_path, representation = views[contract]
+    if data_path.resolve() != (PROJECT_ROOT / expected_path).resolve():
+        raise TrainingConfigError(f"{contract} 要求 data: {expected_path.as_posix()}")
+    manifest_path = data_path.parent / "manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise TrainingConfigError(f"{contract} 缺少或损坏 manifest.json") from exc
+    if (manifest.get("representation") != representation
+            or manifest.get("train_count") != CANONICAL_TRAIN_COUNT
+            or manifest.get("val_count") != CANONICAL_VAL_COUNT
+            or manifest.get("label_dir") != CANONICAL_LABELS.as_posix()):
+        raise TrainingConfigError(f"{contract} manifest 数据来源或 split 不一致")
+    if contract == DEPTH_LOG_CLEAN_CONTRACT and (
+            manifest.get("train_jpg_count") != 122 or manifest.get("val_jpg_count") != 27
+            or manifest.get("jpg_policy", {}).get("physical_unit") != "unknown"):
+        raise TrainingConfigError("Depth log view 的 PNG/JPG 格式合同不一致")
+    train_stems = [line.strip() for line in (PROJECT_ROOT / "data/splits/train.txt").read_text(
+        encoding="utf-8-sig").splitlines() if line.strip()]
+    val_stems = [line.strip() for line in (PROJECT_ROOT / "data/splits/val.txt").read_text(
+        encoding="utf-8-sig").splitlines() if line.strip()]
+    if (len(train_stems) != CANONICAL_TRAIN_COUNT or len(val_stems) != CANONICAL_VAL_COUNT
+            or len(set(train_stems + val_stems)) != CANONICAL_TRAIN_COUNT + CANONICAL_VAL_COUNT):
+        raise TrainingConfigError(f"{contract} 需要固定且无重叠的 1600/400 split")
+    for subset, expected_stems in (("train", train_stems), ("val", val_stems)):
+        image_dir = data_path.parent / "images" / subset
+        actual_stems = [path.stem for path in image_dir.iterdir() if path.is_file()]
+        if len(actual_stems) != len(expected_stems) or set(actual_stems) != set(expected_stems):
+            raise TrainingConfigError(f"{contract} images/{subset} 与固定 split 不一致")
+    canonical = [PROJECT_ROOT / CANONICAL_LABELS / (stem + ".txt") for stem in train_stems + val_stems]
+    staged = ([data_path.parent / "labels/train" / (stem + ".txt") for stem in train_stems]
+              + [data_path.parent / "labels/val" / (stem + ".txt") for stem in val_stems])
+    if any(not path.is_file() for path in canonical + staged):
+        raise TrainingConfigError(f"{contract} labels_clean 文件缺失")
+    source_identity = aggregate_labels(canonical)
+    if (source_identity["aggregate_sha256"] != CANONICAL_LABELS_CLEAN_SHA256
+            or aggregate_labels(staged) != source_identity):
+        raise TrainingConfigError(f"{contract} labels_clean 内容不一致")
+
+
 def project_path(value: Union[str, Path]) -> Path:
     path = Path(value).expanduser()
     return path.resolve() if path.is_absolute() else (PROJECT_ROOT / path).resolve()
@@ -234,9 +281,13 @@ def load_config(path: Path) -> Dict[str, Any]:
             "从零训练请显式设置 pretrained: false。"
         )
     if data_contract is not None:
-        if data_contract != RGB_CLEAN_CONTRACT:
+        if data_contract not in {RGB_CLEAN_CONTRACT, IR_RAW3_CLEAN_CONTRACT,
+                                 DEPTH_LOG_CLEAN_CONTRACT}:
             raise TrainingConfigError(f"未知 data_contract: {data_contract}")
-        validate_clean_rgb_view(data_path)
+        if data_contract == RGB_CLEAN_CONTRACT:
+            validate_clean_rgb_view(data_path)
+        else:
+            validate_clean_modality_view(data_path, data_contract)
     if isinstance(pretrained, str):
         pretrained_path = project_path(pretrained)
         if not pretrained_path.is_file():
@@ -356,6 +407,8 @@ def main() -> int:
     print(f"Ultralytics: {ultralytics.__version__}")
     print(f"CUDA available: {torch.cuda.is_available()}")
     print(f"Model: {model_source}")
+    if Path(model_source).is_file():
+        print(f"Model SHA256: {sha256(Path(model_source))}")
     print(f"Initial weights: {initial_weights or 'embedded in model / none'}")
     if initial_weights is not None:
         print(f"Initial weights policy: {initial_weights_policy}")

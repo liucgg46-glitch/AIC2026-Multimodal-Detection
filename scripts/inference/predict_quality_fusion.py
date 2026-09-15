@@ -70,7 +70,7 @@ def paired_test_records(rgb_dir, ir_dir, depth_dir, expected_count=1000):
     return records
 
 
-def prepare_image(rgb_path, ir_path, depth_path, imgsz):
+def prepare_image(rgb_path, ir_path, depth_path, imgsz, letterbox_mode="auto_rect"):
     rgb, ir = read_raw3(rgb_path), read_raw3(ir_path)
     if rgb.shape != ir.shape:
         raise ValueError("RGB/IR image shapes differ: " + rgb_path.stem)
@@ -79,11 +79,20 @@ def prepare_image(rgb_path, ir_path, depth_path, imgsz):
     gain = min(imgsz / rgb.shape[0], imgsz / rgb.shape[1])
     resized_h = round(rgb.shape[0] * gain)
     resized_w = round(rgb.shape[1] * gain)
-    pad_x = round((imgsz - resized_w) / 2 - 0.1)
-    pad_y = round((imgsz - resized_h) / 2 - 0.1)
-    padded = LetterBox((imgsz, imgsz), auto=False, scaleup=True)(image=raw)
-    if padded.shape != (imgsz, imgsz, 11):
+    if letterbox_mode not in {"auto_rect", "square"}:
+        raise ValueError("letterbox_mode must be auto_rect or square")
+    width_pad, height_pad = imgsz - resized_w, imgsz - resized_h
+    if letterbox_mode == "auto_rect":
+        width_pad %= 32
+        height_pad %= 32
+    pad_x = round(width_pad / 2 - 0.1)
+    pad_y = round(height_pad / 2 - 0.1)
+    padded = LetterBox((imgsz, imgsz), auto=letterbox_mode == "auto_rect",
+                       stride=32, scaleup=True)(image=raw)
+    if padded.ndim != 3 or padded.shape[2] != 11 or any(dim % 32 for dim in padded.shape[:2]):
         raise RuntimeError("LetterBox changed tri-modal transport shape")
+    if letterbox_mode == "square" and padded.shape[:2] != (imgsz, imgsz):
+        raise RuntimeError("Square LetterBox did not produce the requested image size")
     padded[..., 10] = 255 if jpg else 0
     padded = np.ascontiguousarray(padded[..., COLOR_ORDER].transpose(2, 0, 1))
     ratio_pad = ((gain, gain), (pad_x, pad_y))
@@ -126,7 +135,8 @@ def detection_lines(detections, original_shape):
     return lines
 
 
-def run_prediction(records, model, output_zip, device, imgsz=960, conf=0.001, iou=0.7):
+def run_prediction(records, model, output_zip, device, imgsz=960, conf=0.001, iou=0.7,
+                   letterbox_mode="auto_rect"):
     output_zip = Path(output_zip)
     if output_zip.exists():
         raise FileExistsError("Prediction ZIP already exists: " + str(output_zip))
@@ -139,7 +149,9 @@ def run_prediction(records, model, output_zip, device, imgsz=960, conf=0.001, io
     try:
         with zipfile.ZipFile(staging, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             for stem, rgb_path, ir_path, depth_path in records:
-                image, original_shape, ratio_pad = prepare_image(rgb_path, ir_path, depth_path, imgsz)
+                image, original_shape, ratio_pad = prepare_image(
+                    rgb_path, ir_path, depth_path, imgsz, letterbox_mode=letterbox_mode
+                )
                 tensor = torch.from_numpy(image).unsqueeze(0).to(device).float() / 255.0
                 with torch.inference_mode():
                     prediction, _ = model(tensor)
@@ -178,6 +190,8 @@ def main():
     parser.add_argument("--device", default="0")
     parser.add_argument("--expected-count", type=int, default=1000)
     parser.add_argument("--imgsz", type=int, default=960)
+    parser.add_argument("--letterbox-mode", choices=("auto_rect", "square"),
+                        default="auto_rect")
     parser.add_argument("--conf", type=float, default=0.001)
     parser.add_argument("--iou", type=float, default=0.7)
     args = parser.parse_args()
@@ -188,7 +202,8 @@ def main():
     device = resolve_device(args.device)
     model, digest = load_model(args.model, args.model_sha256, device)
     boxes = run_prediction(records, model, args.output_zip, device,
-                           imgsz=args.imgsz, conf=args.conf, iou=args.iou)
+                           imgsz=args.imgsz, conf=args.conf, iou=args.iou,
+                           letterbox_mode=args.letterbox_mode)
     print("QUALITY_FUSION_PREDICTION_PASS images=%d boxes=%d checkpoint_sha256=%s zip=%s" %
           (len(records), boxes, digest, args.output_zip))
     return 0

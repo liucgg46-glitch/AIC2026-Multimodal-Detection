@@ -99,6 +99,52 @@ def test_clean_contract_rejects_broken_manifest(tmp_path, monkeypatch):
         MODULE.validate_clean_rgb_view(staged / "data.yaml")
 
 
+def test_ir_modality_contract_requires_clean_labels_and_exact_view(tmp_path, monkeypatch):
+    monkeypatch.setattr(MODULE, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(MODULE, "CANONICAL_TRAIN_COUNT", 1)
+    monkeypatch.setattr(MODULE, "CANONICAL_VAL_COUNT", 1)
+    split = tmp_path / "data/splits"
+    split.mkdir(parents=True)
+    (split / "train.txt").write_text("train_sample\n", encoding="utf-8")
+    (split / "val.txt").write_text("val_sample\n", encoding="utf-8")
+    canonical = tmp_path / MODULE.CANONICAL_LABELS
+    canonical.mkdir(parents=True)
+    staged = tmp_path / "data/processed/ir_trainable/raw3"
+    for subset, stem in (("train", "train_sample"), ("val", "val_sample")):
+        (staged / "labels" / subset).mkdir(parents=True)
+        (staged / "images" / subset).mkdir(parents=True)
+        (staged / "images" / subset / (stem + ".png")).write_bytes(b"fixture")
+        label = "0 0.5 0.5 0.1 0.1\n"
+        (canonical / (stem + ".txt")).write_text(label, encoding="utf-8")
+        (staged / "labels" / subset / (stem + ".txt")).write_text(label, encoding="utf-8")
+    identity = MODULE.aggregate_labels(list(canonical.glob("*.txt")))
+    monkeypatch.setattr(MODULE, "CANONICAL_LABELS_CLEAN_SHA256", identity["aggregate_sha256"])
+    (staged / "data.yaml").write_text("names: [person]\n", encoding="utf-8")
+    (staged / "manifest.json").write_text(json.dumps({
+        "representation": "raw3", "train_count": 1, "val_count": 1,
+        "label_dir": MODULE.CANONICAL_LABELS.as_posix(),
+    }), encoding="utf-8")
+    MODULE.validate_clean_modality_view(staged / "data.yaml", MODULE.IR_RAW3_CLEAN_CONTRACT)
+    (staged / "labels/val/val_sample.txt").write_text("1 0.5 0.5 0.1 0.1\n")
+    with pytest.raises(MODULE.TrainingConfigError, match="内容不一致"):
+        MODULE.validate_clean_modality_view(staged / "data.yaml", MODULE.IR_RAW3_CLEAN_CONTRACT)
+
+
+def test_depth_log_contract_rejects_unrecorded_jpg_policy(tmp_path, monkeypatch):
+    monkeypatch.setattr(MODULE, "PROJECT_ROOT", tmp_path)
+    staged = tmp_path / "data/processed/depth_trainable/log"
+    staged.mkdir(parents=True)
+    (staged / "data.yaml").write_text("names: [person]\n")
+    (staged / "manifest.json").write_text(json.dumps({
+        "representation": "log", "train_count": 1600, "val_count": 400,
+        "label_dir": MODULE.CANONICAL_LABELS.as_posix(),
+        "train_jpg_count": 122, "val_jpg_count": 27,
+        "jpg_policy": {"physical_unit": "mm"},
+    }))
+    with pytest.raises(MODULE.TrainingConfigError, match="PNG/JPG"):
+        MODULE.validate_clean_modality_view(staged / "data.yaml", MODULE.DEPTH_LOG_CLEAN_CONTRACT)
+
+
 def test_custom_yaml_requires_hashed_explicit_initial_weights(tmp_path, monkeypatch):
     monkeypatch.setattr(MODULE, "PROJECT_ROOT", tmp_path)
     (tmp_path / "data.yaml").write_text("names: [person]\n", encoding="utf-8")
