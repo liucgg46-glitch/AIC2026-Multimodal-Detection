@@ -20,10 +20,13 @@ from src.fusion.quality_model import QualityTriModalModel
 from src.fusion.quality_trainer import QualityFusionTrainer
 
 
+M960_RECT_VAL_BATCH = 16  # RGB_R2_M960 formal log validates val400 in 25 batches
+
+
 def val_loader(trainer, rectangle):
     if not rectangle:
         return trainer.test_loader
-    batch = trainer.batch_size * 2
+    batch = M960_RECT_VAL_BATCH
     dataset = QualityTriModalDataset(
         trainer.tri_records["val"], trainer.args.imgsz, trainer.args,
         augment=False, rect_batch_size=batch,
@@ -76,6 +79,8 @@ def audit(config_path, best_path, expected_best_sha256, output):
         "source_m960_sha256": config["initial_checkpoint_sha256"],
         "best_pt_sha256": None,
         "baseline_m960_original_reval_map5095": 0.47901307551468025,
+        "square_val_batch": trainer.test_loader.batch_size,
+        "rectangle_val_batch": M960_RECT_VAL_BATCH,
         "results": {},
     }
     for geometry, loader in (("square", square), ("rectangle", rectangle)):

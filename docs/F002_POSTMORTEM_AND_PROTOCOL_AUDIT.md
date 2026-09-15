@@ -34,6 +34,10 @@ for the **same tensor**, while obtaining a different AP when its letterboxed ten
 the original M960 validation path. The original `0.479013` must therefore not be used as proof
 of modality damage until a same-protocol control is measured.
 
+The original M960 formal log validates val400 in 25 batches, so its rectangular validation batch
+is 16. The audit fixes this value explicitly; using F002's validation batch 8 would create different
+aspect-ratio groups and would not reproduce the M960 geometry exactly.
+
 The read-only audit script now reproduces rectangular batching, fixes the rectangular
 `ratio_pad` gain, and measures on the fixed val400:
 

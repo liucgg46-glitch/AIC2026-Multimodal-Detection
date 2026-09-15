@@ -8,7 +8,7 @@ from ultralytics.nn.tasks import DetectionModel
 from scripts.inference.predict_quality_fusion import (
     detection_lines, paired_test_records, prepare_image, resolve_device, run_prediction,
 )
-from scripts.analysis.audit_f002_quality import validate_mode
+from scripts.analysis.audit_f002_quality import M960_RECT_VAL_BATCH, validate_mode
 from src.fusion.quality_dataset import QualityTriModalDataset, decode_depth, edge_dark_valid_region
 from src.fusion.quality_model import QualityTriModalModel, QualityResidual
 
@@ -193,6 +193,7 @@ def test_rectangular_validation_groups_aspect_ratios_and_keeps_ratio_metadata(tm
 
 
 def test_audit_ablation_changes_only_the_requested_modality():
+    assert M960_RECT_VAL_BATCH == 16
     class Validator:
         def preprocess(self, batch):
             return batch
