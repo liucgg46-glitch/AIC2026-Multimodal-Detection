@@ -1,0 +1,66 @@
+experiment_id: F002_M960_RGB_IR_DEPTH_QUALITY_P345
+architecture:
+  rgb_backbone: yolo11m_from_RGB_R2_M960_best
+  auxiliary_pyramids: small_ir_and_format_aware_depth
+  fusion_levels: [P3, P4, P5]
+  masks: [ir_edge_connected_dark_border, depth_format_aware_valid_region]
+  dropout_probability: 0.2
+  stage: frozen_rgb_24_layers
+initial_checkpoint: runs/RGB_R2_M960/weights/best.pt
+initial_checkpoint_sha256: 097852eb7357dc8b7db72fef82e0485e5542a67b051977451edd4305be70ac85
+data_contract: canonical_quality11_v1
+train:
+  model: yolo11m.yaml
+  data: configs/data/F002_RGB_IR_DEPTH_QUALITY11.yaml
+  task: detect
+  seed: 2026
+  deterministic: true
+  imgsz: 960
+  epochs: 100
+  patience: 30
+  batch: 4
+  workers: 8
+  nbs: 64
+  device: 0
+  pretrained: false
+  freeze: 24
+  amp: true
+  plots: false
+  cache: false
+  rect: false
+  resume: false
+  compile: false
+  fraction: 1.0
+  mosaic: 0.0
+  mixup: 0.0
+  cutmix: 0.0
+  copy_paste: 0.0
+  close_mosaic: 0
+  degrees: 0.0
+  translate: 0.1
+  scale: 0.5
+  shear: 0.0
+  perspective: 0.0
+  bgr: 0.0
+  fliplr: 0.5
+  flipud: 0.0
+  multi_scale: false
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  optimizer: AdamW
+  lr0: 0.0005
+  lrf: 0.01
+  momentum: 0.9
+  weight_decay: 0.0005
+  warmup_epochs: 3.0
+  warmup_bias_lr: 0.0
+  cos_lr: true
+  conf: 0.001
+  iou: 0.7
+  max_det: 100
+  val: true
+  save: true
+  project: runs
+  name: F002_M960_RGB_IR_DEPTH_QUALITY_P345
+  exist_ok: false

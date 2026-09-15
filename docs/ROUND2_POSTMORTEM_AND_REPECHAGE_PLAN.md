@@ -52,10 +52,25 @@ pretrained weights are allowed. Repechage deliverables include runnable preproce
 inference code; a Markdown README with weight download, setup and commands; requirements; and the
 leaderboard result file. The half-final additionally needs a PDF technical report.
 
-The notice's schedule and exact upload naming are in two PDF attachments. Their web retrieval timed
-out during this audit, so exact score-2 dates and attachment-specific naming must be verified from
-the official account/download before preparing the final upload. No date is inferred from other
-tracks.
+The official [schedule PDF](official/repechage_2026/附件1：第八届AIC算法大赛算法挑战赛道复赛赛事日程表.pdf)
+and [submission PDF](official/repechage_2026/附件2：第八届AIC算法大赛算法挑战赛道复赛作品提交要求.pdf)
+were supplied locally on 2026-09-15. The score-2 row shares these dates with scores 1, 3 and 4:
+
+| event | deadline / opening (China local time, 2026) |
+| --- | --- |
+| initial registration | September 20, 18:00 |
+| initial prediction-result document | September 20, 20:00 |
+| repechage dataset release | September 21, 11:00 |
+| repechage prediction-result submissions open | September 22, 09:00 |
+| repechage prediction-result submissions close | October 5, 20:00 |
+| repechage code and other works close | October 7, 23:59 |
+
+The work materials are uploaded as one online-drive link through the competition account. Its root
+folder must be named `参赛团队编号-团队名称-复赛-队长姓名`. The example contains
+`参赛团队编号-技术方案.PDF`, `参赛团队编号-模型文件`, and
+`参赛团队编号-代码与数据/`. The prediction ZIP is submitted separately as the result document.
+Check the score-specific rules for the exact contents; the general attachment is a folder/link
+template. The schedule notes that adjustments may be announced in the score QQ group `1023687056`.
 
 ## Next experiment order
 
