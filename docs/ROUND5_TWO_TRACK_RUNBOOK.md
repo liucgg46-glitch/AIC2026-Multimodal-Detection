@@ -146,9 +146,9 @@ python scripts/train/prepare_deimv2_runtime.py \
   --output data/processed/deimv2_runtime/deimv2_s_formal.yml
 ```
 
-导出必须生成 1600/400 张图、12 类、类别 ID `0..11`，`manifest.json` 中的 labels SHA 必须匹配。配置生成器拒绝错误源码 commit、脏源码 checkout、错误骨干哈希或错误数据合同。
+导出必须生成 1600/400 张图、12 类、类别 ID `0..11`，`manifest.json` 中的 labels 与原始 visible 图片 aggregate SHA 必须匹配。配置生成器会重新读取导出的图片和 annotation 文件，拒绝错误源码 commit、脏源码 checkout、权重哈希或数据合同。
 
-本地完整导出的确定性参考值为：train `12153` 个框、annotation SHA256 `ecb518c6bc4b78d86f7e7d33edceefea186e313cb129b43344ac995ebe0d5c85`；val `3041` 个框、annotation SHA256 `159b1b92b86276202b1f77a1c947514a682f9a1c2a62ee8356a55bc4ad8669a4`。服务器 manifest 应与之相同。
+跨平台统一参考值为：train `12153` 个框、annotation SHA256 `7a0c369ee0c4ca0a15858436904fadcbf6fb105741c43611498ed9c2d5f88536`；val `3041` 个框、annotation SHA256 `d33c458bc9d09cd40f609c12e8548a96757cedcb88609f53d503831a32436a6a`。原始 visible 图片 aggregate SHA256 分别是 train `a30d51404d21017766434fbfc03b07e89101d4121a61ec3239b1b70de51e3626`、val `92b505f0391ba3f084b9c677ba1907f1a2ed26af9cec6c1e85f0189023718a0a`。服务器重导出必须全部匹配，否则停止 smoke。旧 Windows annotation SHA 只因文本模式写入 `CRLF` 而不同，见 `docs/DEIMV2_COCO_SHA_DIAGNOSTIC.md`。
 
 ### 2.4 smoke 与正式训练
 

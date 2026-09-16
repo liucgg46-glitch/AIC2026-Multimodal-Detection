@@ -58,6 +58,10 @@ def test_coco_export_preserves_split_and_uses_zero_based_categories(tmp_path, mo
     monkeypatch.setattr(COCO, "TRAIN_COUNT", 1)
     monkeypatch.setattr(COCO, "VAL_COUNT", 1)
     monkeypatch.setattr(COCO, "EXPECTED_LABEL_SHA256", COCO.aggregate_labels(labels.glob("*.txt"))["aggregate_sha256"])
+    monkeypatch.setattr(COCO, "EXPECTED_VISIBLE_SHA256", {
+        "train": COCO.aggregate_visible(["train"], COCO.image_index(visible)),
+        "val": COCO.aggregate_visible(["val"], COCO.image_index(visible)),
+    })
     output = tmp_path / "coco"
     manifest = COCO.build_coco_view(visible, labels, train_split, val_split, output, link_mode="copy")
     train = json.loads((output / "annotations/instances_train.json").read_text())
@@ -66,6 +70,11 @@ def test_coco_export_preserves_split_and_uses_zero_based_categories(tmp_path, mo
     assert val["annotations"][0]["category_id"] == 11
     assert train["annotations"][0]["bbox"] == [10.0, 5.0, 20.0, 10.0]
     assert manifest["train_count"] == manifest["val_count"] == 1
+    for path in (output / "annotations/instances_train.json",
+                 output / "annotations/instances_val.json", output / "manifest.json"):
+        raw = path.read_bytes()
+        assert raw.endswith(b"\n") and not raw.endswith(b"\r\n")
+        assert b"\r" not in raw
 
 
 def test_runtime_config_overrides_custom_dataset_and_schedule(tmp_path, monkeypatch):
@@ -76,11 +85,29 @@ def test_runtime_config_overrides_custom_dataset_and_schedule(tmp_path, monkeypa
     dataset = tmp_path / "dataset"
     for path in (dataset / "images/train", dataset / "images/val", dataset / "annotations"):
         path.mkdir(parents=True, exist_ok=True)
-    (dataset / "annotations/instances_train.json").write_text("{}")
-    (dataset / "annotations/instances_val.json").write_text("{}")
+    train_ann = dataset / "annotations/instances_train.json"
+    val_ann = dataset / "annotations/instances_val.json"
+    (dataset / "images/train/train.jpg").write_bytes(b"train fixture")
+    (dataset / "images/val/val.jpg").write_bytes(b"val fixture")
+    train_ann.write_bytes(b'{"images":[{"file_name":"train.jpg"}]}\n')
+    val_ann.write_bytes(b'{"images":[{"file_name":"val.jpg"}]}\n')
+    visible_identity = {
+        "train": COCO.aggregate_visible(["train"], COCO.image_index(dataset / "images/train")),
+        "val": COCO.aggregate_visible(["val"], COCO.image_index(dataset / "images/val")),
+    }
+    monkeypatch.setattr(RUNTIME, "EXPECTED_VISIBLE_SHA256", visible_identity)
+    monkeypatch.setattr(RUNTIME, "EXPECTED_ANNOTATIONS", {
+        "train": (1, 1, RUNTIME.sha256(train_ann)),
+        "val": (1, 1, RUNTIME.sha256(val_ann)),
+    })
     (dataset / "manifest.json").write_text(json.dumps({
         "representation": "rgb_coco_labels_clean_v1", "train_count": 1600, "val_count": 400,
         "labels_identity": {"aggregate_sha256": "6a670b95b33e803e5d25fc30d7bbd7985cbc4799234c37ff42b3b1c9204025a4"},
+        "visible_identity": visible_identity,
+        "subsets": {
+                "train": {"images": 1, "annotations": 1, "annotation_sha256": RUNTIME.sha256(train_ann)},
+                "val": {"images": 1, "annotations": 1, "annotation_sha256": RUNTIME.sha256(val_ann)},
+        },
     }))
     backbone = tmp_path / "vitt_distill.pt"; backbone.write_bytes(b"fixture")
     checkpoint = tmp_path / "deimv2_s.pth"; checkpoint.write_bytes(b"fixture")
@@ -91,6 +118,13 @@ def test_runtime_config_overrides_custom_dataset_and_schedule(tmp_path, monkeypa
     assert config["epoches"] == 72
     assert config["train_dataloader"]["dataset"]["ann_file"].endswith("instances_train.json")
     assert config["DINOv3STAs"]["weights_path"].endswith("vitt_distill.pt")
+    train_ann.write_bytes(b'{"images":[{"file_name":"train.jpg"}]}\r\n')
+    with pytest.raises(RUNTIME.AssetError, match="annotation SHA/count"):
+        RUNTIME.dataset_contract(dataset)
+    train_ann.write_bytes(b'{"images":[{"file_name":"train.jpg"}]}\n')
+    (dataset / "images/train/train.jpg").write_bytes(b"tampered")
+    with pytest.raises(RUNTIME.AssetError, match="图像字节 aggregate SHA256"):
+        RUNTIME.dataset_contract(dataset)
 
 
 def test_ir_decision_requires_all_predeclared_checks():

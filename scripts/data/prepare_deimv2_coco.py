@@ -20,6 +20,10 @@ CLASS_NAMES = [
     "light", "garbage can", "uav", "tricycle",
 ]
 EXPECTED_LABEL_SHA256 = "6a670b95b33e803e5d25fc30d7bbd7985cbc4799234c37ff42b3b1c9204025a4"
+EXPECTED_VISIBLE_SHA256 = {
+    "train": "a30d51404d21017766434fbfc03b07e89101d4121a61ec3239b1b70de51e3626",
+    "val": "92b505f0391ba3f084b9c677ba1907f1a2ed26af9cec6c1e85f0189023718a0a",
+}
 TRAIN_COUNT = 1600
 VAL_COUNT = 400
 IMAGE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
@@ -37,6 +41,15 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def write_json_lf(path: Path, payload: object, *, compact: bool) -> None:
+    """Write exact UTF-8/LF bytes on Windows and Linux, including Python 3.8."""
+    if compact:
+        content = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    else:
+        content = json.dumps(payload, indent=2, sort_keys=True)
+    path.write_bytes((content + "\n").encode("utf-8"))
+
+
 def aggregate_labels(paths: Iterable[Path]) -> Dict[str, object]:
     paths = sorted(paths, key=lambda item: (item.name.casefold(), item.name))
     digest = hashlib.sha256()
@@ -46,6 +59,17 @@ def aggregate_labels(paths: Iterable[Path]) -> Dict[str, object]:
         digest.update(("%s\0%d\0%s\n" % (path.name, size, sha256(path))).encode("utf-8"))
         total_bytes += size
     return {"aggregate_sha256": digest.hexdigest(), "file_count": len(paths), "total_bytes": total_bytes}
+
+
+def aggregate_visible(stems: Iterable[str], images: Dict[str, Path]) -> str:
+    """Fingerprint exact encoded image bytes in fixed split order."""
+    digest = hashlib.sha256()
+    for stem in stems:
+        source = images[stem]
+        digest.update(("%s\0%s\0%d\0%s\n" % (
+            stem, source.name, source.stat().st_size, sha256(source)
+        )).encode("utf-8"))
+    return digest.hexdigest()
 
 
 def read_split(path: Path, expected: int) -> List[str]:
@@ -121,6 +145,12 @@ def build_coco_view(
     missing = [stem for stem in train_stems + val_stems if stem not in images]
     if missing:
         raise CocoExportError("RGB 图像缺失: %s" % missing[:5])
+    visible_identity = {
+        "train": aggregate_visible(train_stems, images),
+        "val": aggregate_visible(val_stems, images),
+    }
+    if visible_identity != EXPECTED_VISIBLE_SHA256:
+        raise CocoExportError("原始 visible 图像 aggregate SHA256 不一致: %s" % visible_identity)
     if output_root.exists() and not force:
         raise CocoExportError("输出已存在；重建必须显式 --force: %s" % output_root)
 
@@ -161,8 +191,7 @@ def build_coco_view(
                                for index, name in enumerate(CLASS_NAMES)],
             }
             annotation_path = staging / "annotations" / ("instances_%s.json" % subset)
-            annotation_path.write_text(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
-                                       encoding="utf-8")
+            write_json_lf(annotation_path, payload, compact=True)
             subset_stats[subset] = {
                 "images": len(coco_images), "annotations": len(annotations),
                 "annotation_sha256": sha256(annotation_path),
@@ -171,10 +200,10 @@ def build_coco_view(
             "schema_version": 1, "representation": "rgb_coco_labels_clean_v1",
             "category_id_range": [0, 11], "train_count": TRAIN_COUNT, "val_count": VAL_COUNT,
             "labels_identity": label_identity, "subsets": subset_stats,
+            "visible_identity": visible_identity,
             "materialization": dict(sorted(methods.items())),
         }
-        (staging / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n",
-                                                encoding="utf-8")
+        write_json_lf(staging / "manifest.json", manifest, compact=False)
         if output_root.exists():
             shutil.rmtree(output_root)
         staging.replace(output_root)

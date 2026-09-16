@@ -13,8 +13,16 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.train.verify_round5_assets import (  # noqa: E402
-    ASSETS, AssetError, DEIMV2_COMMIT, verify_file, verify_git_checkout,
+    ASSETS, AssetError, DEIMV2_COMMIT, sha256, verify_file, verify_git_checkout,
 )
+from scripts.data.prepare_deimv2_coco import (  # noqa: E402
+    EXPECTED_VISIBLE_SHA256, aggregate_visible, image_index,
+)
+
+EXPECTED_ANNOTATIONS = {
+    "train": (1600, 12153, "7a0c369ee0c4ca0a15858436904fadcbf6fb105741c43611498ed9c2d5f88536"),
+    "val": (400, 3041, "d33c458bc9d09cd40f609c12e8548a96757cedcb88609f53d503831a32436a6a"),
+}
 
 
 def dataset_contract(dataset_root: Path) -> Dict[str, Any]:
@@ -37,6 +45,27 @@ def dataset_contract(dataset_root: Path) -> Dict[str, Any]:
     ]
     if any(not path.exists() for path in required):
         raise AssetError("DEIMv2 COCO 数据视图不完整")
+    if manifest.get("visible_identity") != EXPECTED_VISIBLE_SHA256:
+        raise AssetError("DEIMv2 COCO manifest 的原图身份不一致")
+    for subset, (image_count, annotation_count, expected_sha) in EXPECTED_ANNOTATIONS.items():
+        recorded = manifest.get("subsets", {}).get(subset, {})
+        annotation_path = dataset_root / "annotations" / ("instances_%s.json" % subset)
+        actual_sha = sha256(annotation_path)
+        if (recorded.get("images") != image_count
+                or recorded.get("annotations") != annotation_count
+                or recorded.get("annotation_sha256") != expected_sha
+                or actual_sha != expected_sha):
+            raise AssetError("DEIMv2 %s annotation SHA/count 不一致: %s" % (subset, actual_sha))
+        images_in_json = json.loads(annotation_path.read_text(encoding="utf-8"))["images"]
+        if len(images_in_json) != image_count:
+            raise AssetError("DEIMv2 %s COCO images 数量不一致" % subset)
+        stems = [Path(item["file_name"]).stem for item in images_in_json]
+        staged_images = image_index(dataset_root / "images" / subset)
+        if len(staged_images) != image_count or set(stems) != set(staged_images):
+            raise AssetError("DEIMv2 %s COCO images 列表与文件不一致" % subset)
+        actual_visible_sha = aggregate_visible(stems, staged_images)
+        if actual_visible_sha != EXPECTED_VISIBLE_SHA256[subset]:
+            raise AssetError("DEIMv2 %s 图像字节 aggregate SHA256 不一致" % subset)
     return manifest
 
 

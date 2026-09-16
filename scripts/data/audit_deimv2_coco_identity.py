@@ -23,6 +23,8 @@ def digest_lines(lines: List[str]) -> str:
 
 def load_subset(dataset_root: Path, subset: str) -> Dict[str, Any]:
     path = dataset_root / "annotations" / ("instances_%s.json" % subset)
+    if not path.is_file():
+        path = dataset_root / ("instances_%s.json" % subset)
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -107,7 +109,9 @@ def main() -> int:
                 load_subset(args.dataset_root, subset), load_subset(args.compare_root, subset)
             )
             identity["compare_annotation_sha256"] = sha256(
-                args.compare_root / "annotations" / ("instances_%s.json" % subset)
+                (args.compare_root / "annotations" / ("instances_%s.json" % subset))
+                if (args.compare_root / "annotations" / ("instances_%s.json" % subset)).is_file()
+                else (args.compare_root / ("instances_%s.json" % subset))
             )
         report["subsets"][subset] = identity
     print(json.dumps(report, indent=2, sort_keys=True))
