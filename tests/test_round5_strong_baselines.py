@@ -25,6 +25,7 @@ COCO = load_script("round5_coco", "scripts/data/prepare_deimv2_coco.py")
 ASSETS = load_script("round5_assets", "scripts/train/verify_round5_assets.py")
 RUNTIME = load_script("round5_runtime", "scripts/train/prepare_deimv2_runtime.py")
 IR = load_script("round5_ir", "scripts/analysis/audit_ir_heat_residual.py")
+IDENTITY = load_script("round5_identity", "scripts/data/audit_deimv2_coco_identity.py")
 
 
 def test_round5_yolo11x_config_is_hashed_clean_rgb_x1280():
@@ -120,3 +121,12 @@ def test_ir_alignment_applies_inverse_reported_displacement():
     shifted = cv2.warpAffine(image, np.float32([[1, 0, 4], [0, 1, -3]]), (50, 40))
     aligned, _ = IR.align_ir(shifted, np.ones_like(shifted, dtype=bool), dx=4, dy=-3)
     assert np.array_equal(aligned, image)
+
+
+def test_coco_semantic_diff_reports_first_nested_value():
+    left = {"images": [{"width": 640}], "annotations": [{"bbox": [1.0, 2.0]}]}
+    right = {"images": [{"width": 640}], "annotations": [{"bbox": [1.0, 3.0]}]}
+    difference = IDENTITY.first_semantic_diff(left, right)
+    assert difference == {"path": "$.annotations[0].bbox[1]", "left": 2.0,
+                          "right": 3.0, "reason": "value"}
+    assert IDENTITY.first_semantic_diff(left, json.loads(json.dumps(left, indent=2))) is None
