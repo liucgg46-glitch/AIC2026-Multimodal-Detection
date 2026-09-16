@@ -270,6 +270,7 @@ def load_config(path: Path) -> Dict[str, Any]:
     config["project"] = str(project_path(config.get("project", "runs")))
 
     model = Path(str(config["model"]))
+    model_sha256 = config.pop("model_sha256", None)
     pretrained = config.get("pretrained", True)
     initial_weights = config.get("initial_weights")
     initial_weights_sha256 = config.pop("initial_weights_sha256", None)
@@ -298,6 +299,14 @@ def load_config(path: Path) -> Dict[str, Any]:
         raise TrainingConfigError(f"请先准备本地离线权重: {local_model}")
     if local_model.is_file():
         config["model"] = str(local_model)
+        if model_sha256 is not None:
+            actual_model_sha256 = sha256(local_model)
+            if actual_model_sha256.lower() != str(model_sha256).lower():
+                raise TrainingConfigError(
+                    f"模型权重 SHA256 不一致: {actual_model_sha256} != {model_sha256}"
+                )
+    elif model_sha256 is not None:
+        raise TrainingConfigError("model_sha256 只能用于本地 model 权重")
     if initial_weights is not None:
         if model.suffix.lower() not in {".yaml", ".yml"}:
             raise TrainingConfigError("initial_weights 只用于自定义 model YAML")
@@ -371,6 +380,10 @@ def parse_args() -> argparse.Namespace:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--train", action="store_true", help="Run the frozen formal experiment")
     mode.add_argument("--smoke", action="store_true", help="Run one short GPU integration epoch")
+    mode.add_argument(
+        "--smoke-full", action="store_true",
+        help="Run one short epoch at the configured image size and batch to catch OOM",
+    )
     parser.add_argument("--expected-sha", default="")
     return parser.parse_args()
 
@@ -395,7 +408,10 @@ def main() -> int:
         print("错误: --expected-sha 只用于 --train", file=sys.stderr)
         return 2
 
-    mode_name = "formal" if args.train else "smoke" if args.smoke else "check-only"
+    mode_name = (
+        "formal" if args.train else "full-resolution-smoke" if args.smoke_full
+        else "smoke" if args.smoke else "check-only"
+    )
     model_source = str(config.pop("model"))
     initial_weights = config.pop("initial_weights", None)
     initial_weights_policy = config.pop("initial_weights_policy", None)
@@ -414,22 +430,26 @@ def main() -> int:
         print(f"Initial weights policy: {initial_weights_policy}")
     print(f"Data: {config['data']}")
 
-    if not (args.train or args.smoke):
+    if not (args.train or args.smoke or args.smoke_full):
         print("配置与本地权重检查通过；未启动训练。")
         return 0
 
-    if args.smoke:
-        config.update(
+    if args.smoke or args.smoke_full:
+        smoke_settings = dict(
             epochs=1,
             patience=1,
-            batch=min(int(config.get("batch", 1)), 2),
             workers=0,
-            imgsz=min(int(config.get("imgsz", 640)), 320),
             fraction=0.05,
             plots=False,
-            name=experiment_id + "_SMOKE",
+            name=experiment_id + ("_SMOKE_FULL" if args.smoke_full else "_SMOKE"),
             exist_ok=True,
         )
+        if not args.smoke_full:
+            smoke_settings.update(
+                batch=min(int(config.get("batch", 1)), 2),
+                imgsz=min(int(config.get("imgsz", 640)), 320),
+            )
+        config.update(smoke_settings)
 
     started = time.perf_counter()
     model = YOLO(model_source)

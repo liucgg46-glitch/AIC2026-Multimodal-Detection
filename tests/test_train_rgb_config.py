@@ -49,6 +49,26 @@ def test_main_defaults_to_check_only(tmp_path, monkeypatch, capsys):
     assert "未启动训练" in capsys.readouterr().out
 
 
+def test_local_model_sha256_is_mandatory_when_declared(tmp_path, monkeypatch):
+    monkeypatch.setattr(MODULE, "PROJECT_ROOT", tmp_path)
+    (tmp_path / "data.yaml").write_text("names: [person]\n")
+    weights = tmp_path / "weights.pt"
+    weights.write_bytes(b"fixed model")
+    config = dict(
+        experiment_id="hashed", model="weights.pt", data="data.yaml", pretrained=True,
+        model_sha256=MODULE.sha256(weights),
+    )
+    path = tmp_path / "experiment.yaml"
+    path.write_text(yaml.safe_dump(config))
+    loaded = MODULE.load_config(path)
+    assert loaded["model"] == str(weights)
+    assert "model_sha256" not in loaded
+    config["model_sha256"] = "0" * 64
+    path.write_text(yaml.safe_dump(config))
+    with pytest.raises(MODULE.TrainingConfigError, match="模型权重 SHA256"):
+        MODULE.load_config(path)
+
+
 def _make_clean_contract(tmp_path, monkeypatch):
     monkeypatch.setattr(MODULE, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(MODULE, "CANONICAL_TRAIN_COUNT", 1)

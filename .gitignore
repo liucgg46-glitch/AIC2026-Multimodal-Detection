@@ -204,6 +204,9 @@ weights/**
 *.onnx
 *.engine
 
+# Third-party source checkouts are pinned in docs/scripts, not vendored.
+source_packages/
+
 # Training outputs
 runs/**
 !runs/**/
