@@ -385,8 +385,13 @@ def write_outputs(payload: Dict[str, Any]) -> None:
     log_text = render_log(payload)
     json_temp = JSON_OUTPUT.with_suffix(".json.tmp")
     log_temp = LOG_OUTPUT.with_suffix(".log.tmp")
-    json_temp.write_text(json_text, encoding="utf-8", newline="\n")
-    log_temp.write_text(log_text, encoding="utf-8", newline="\n")
+    # pathlib.Path.write_text() gained ``newline`` only in Python 3.10.
+    # The competition server is pinned to Python 3.8, where open() already
+    # provides the same deterministic LF contract.
+    with json_temp.open("w", encoding="utf-8", newline="\n") as stream:
+        stream.write(json_text)
+    with log_temp.open("w", encoding="utf-8", newline="\n") as stream:
+        stream.write(log_text)
     json_temp.replace(JSON_OUTPUT)
     log_temp.replace(LOG_OUTPUT)
 
