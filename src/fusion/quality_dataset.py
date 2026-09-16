@@ -189,17 +189,29 @@ class QualityTriModalDataset(Dataset):
                 RandomFlip(hyp.fliplr, "horizontal"),
                 RGBOnlyHSV(hyp),
             ]
-        transforms.append(TriModalFormat(bbox_format="xywh", normalize=True, batch_idx=True))
+        transforms.append(self._make_format())
         self.transforms = Compose(transforms)
+
+    def _make_format(self):
+        return TriModalFormat(bbox_format="xywh", normalize=True, batch_idx=True)
 
     def __len__(self):
         return len(self.records)
 
+    def _encode_record(self, rgb, ir, depth_path):
+        encoded, jpg = decode_depth(depth_path, rgb.shape[:2])
+        return encode_transport(rgb, ir, encoded, jpg), jpg
+
+    def _finalize_transport(self, image, jpg):
+        image[10].fill_(255 if jpg else 0)  # format is an image-level token
+
+    def _drop_depth(self, image):
+        image[6:9].zero_()
+
     def __getitem__(self, index):
         stem, rgb_path, ir_path, depth_path, _ = self.records[index]
         rgb, ir = read_raw3(rgb_path), read_raw3(ir_path)
-        encoded, jpg = decode_depth(depth_path, rgb.shape[:2])
-        image = encode_transport(rgb, ir, encoded, jpg)
+        image, jpg = self._encode_record(rgb, ir, depth_path)
         ratio_pad = (1.0, 1.0)
         if self.rgb_protocol_resize:
             image, ratio_pad = resize_like_yolo(image, self.imgsz)
@@ -212,11 +224,11 @@ class QualityTriModalDataset(Dataset):
         if self.rect:
             label["rect_shape"] = tuple(self.batch_shapes[self.batch[index]])
         sample = self.transforms(label)
-        sample["img"][10].fill_(255 if jpg else 0)  # format is an image-level token
+        self._finalize_transport(sample["img"], jpg)
         if self.augment:
             if np.random.random() < self.dropout_probability:
                 sample["img"][3:6].zero_()
                 sample["img"][9].zero_()
             if np.random.random() < self.dropout_probability:
-                sample["img"][6:9].zero_()
+                self._drop_depth(sample["img"])
         return sample
