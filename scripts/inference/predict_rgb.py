@@ -89,6 +89,7 @@ def run_inference(
     iou: float,
     max_det: int,
     force: bool,
+    augment: bool = False,
 ) -> Tuple[int, int, float]:
     if not 0.0 <= conf <= 1.0:
         raise InferenceError("--conf 必须位于 [0, 1]")
@@ -116,6 +117,7 @@ def run_inference(
             conf=conf,
             iou=iou,
             max_det=max_det,
+            augment=augment,
             stream=True,
             save=False,
             save_txt=False,
@@ -167,6 +169,7 @@ def parse_args() -> argparse.Namespace:
                         help="AP submission candidate threshold (not a display threshold)")
     parser.add_argument("--iou", type=float, default=0.7)
     parser.add_argument("--max-det", type=int, default=100)
+    parser.add_argument("--augment", action="store_true", help="Ultralytics test-time augmentation candidate")
     parser.add_argument("--force", action="store_true")
     return parser.parse_args()
 
@@ -187,6 +190,7 @@ def main() -> int:
             iou=args.iou,
             max_det=args.max_det,
             force=args.force,
+            augment=args.augment,
         )
     except (InferenceError, OSError, RuntimeError) as exc:
         print(f"错误: {exc}", file=sys.stderr)
