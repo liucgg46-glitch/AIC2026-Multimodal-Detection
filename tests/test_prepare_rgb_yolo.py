@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 from pathlib import Path
 
@@ -56,6 +57,9 @@ def test_builds_standard_view_for_mixed_extensions(tmp_path: Path) -> None:
     assert config["train"] == "images/train"
     assert config["val"] == "images/val"
     assert len(config["names"]) == 12
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["representation"] == "rgb_byte_preserving"
+    assert manifest["labels_identity"]["file_count"] == 2
 
 
 def test_builds_view_from_raw_visible_and_independent_clean_labels(
@@ -122,3 +126,40 @@ def test_train_val_overlap_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(MODULE.DatasetViewError, match="train/val split 存在重复 stem"):
         MODULE.validate_sources(data_root, train_split, val_split)
+
+
+def test_clean_contract_rejects_noncanonical_or_modified_labels(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(MODULE, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(MODULE, "CANONICAL_TRAIN_COUNT", 1)
+    monkeypatch.setattr(MODULE, "CANONICAL_VAL_COUNT", 1)
+    data_root = make_source(tmp_path, {"train_sample": ".jpg", "val_sample": ".png"})
+    clean = tmp_path / MODULE.CANONICAL_LABEL_DIR
+    clean.mkdir(parents=True)
+    for stem in ("train_sample", "val_sample"):
+        (clean / (stem + ".txt")).write_text("0 0.5 0.5 0.1 0.1\n", encoding="utf-8")
+    train_split = write_split(tmp_path / "train.txt", ["train_sample"])
+    val_split = write_split(tmp_path / "val.txt", ["val_sample"])
+    identity = MODULE.aggregate_labels(list(clean.glob("*.txt")))
+    monkeypatch.setattr(MODULE, "CANONICAL_LABELS_CLEAN_SHA256", identity["aggregate_sha256"])
+    output = tmp_path / MODULE.CANONICAL_OUTPUT_ROOT
+
+    MODULE.build_view(
+        data_root, train_split, val_split, output, label_dir=clean,
+        require_clean_contract=True,
+    )
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["representation"] == "rgb_byte_preserving_clean_labels"
+
+    (clean / "train_sample.txt").write_text("1 0.5 0.5 0.1 0.1\n", encoding="utf-8")
+    with pytest.raises(MODULE.DatasetViewError, match="SHA256"):
+        MODULE.build_view(
+            data_root, train_split, val_split, output, label_dir=clean,
+            force=True, require_clean_contract=True,
+        )
+
+
+def test_cli_defaults_to_clean_labels_and_clean_output(monkeypatch) -> None:
+    monkeypatch.setattr(MODULE.sys, "argv", ["prepare_rgb_yolo.py"])
+    args = MODULE.parse_args()
+    assert args.label_dir == "data/processed/train/labels_clean"
+    assert args.output_root == "data/processed/rgb_yolo_clean"

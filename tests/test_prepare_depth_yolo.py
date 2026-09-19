@@ -126,7 +126,9 @@ def test_canonical_build_counts_and_empty_label(canonical_project: Dict[str, Pat
 
 
 def test_png_conversion_is_exact_lossless_and_preserves_zero(canonical_project: Dict[str, Path]) -> None:
-    source = cv2.imread(str(canonical_project["depth_dir"] / "train_png.png"), cv2.IMREAD_UNCHANGED)
+    # Independent decoder: Ultralytics may globally patch cv2.imread to add a dimension.
+    source = cv2.imdecode(np.frombuffer(
+        (canonical_project["depth_dir"] / "train_png.png").read_bytes(), dtype=np.uint8), cv2.IMREAD_UNCHANGED)
     build_canonical(canonical_project)
     staged_path = canonical_project["output"] / "images/train/train_png.png"
     staged = cv2.imread(str(staged_path), cv2.IMREAD_UNCHANGED)

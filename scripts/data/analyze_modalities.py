@@ -1700,9 +1700,9 @@ def main() -> None:
             writer = csv.DictWriter(stream, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(rows)
-        args.output_report.write_text(
-            generate_report(summary, c4_review), encoding="utf-8", newline="\n"
-        )
+        # Path.write_text(newline=...) requires Python 3.10; production uses 3.8.
+        with args.output_report.open("w", encoding="utf-8", newline="\n") as stream:
+            stream.write(generate_report(summary, c4_review))
         print(f"Wrote: {args.output_json}")
         print(f"Wrote: {args.output_csv}")
         print(f"Wrote: {args.output_report}")

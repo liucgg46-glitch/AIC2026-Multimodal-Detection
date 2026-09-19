@@ -204,10 +204,16 @@ weights/**
 *.onnx
 *.engine
 
+# Third-party source checkouts are pinned in docs/scripts, not vendored.
+source_packages/
+
 # Training outputs
 runs/**
 !runs/**/
 !runs/**/.gitkeep
+
+# Ultralytics may create a local settings directory when its global config is unavailable.
+Ultralytics/
 
 # Generated submissions and visualizations
 outputs/submissions/**
@@ -219,6 +225,7 @@ outputs/visualization/**
 !outputs/visualization/**/.gitkeep
 
 # Locally regenerated E001 hard-case previews (keep CSV stem manifest in Git)
+outputs/analysis/audit_runtime/
 outputs/analysis/e001_error_analysis/hard_cases/*.jpg
 
 # Keep these under version control:
@@ -230,3 +237,6 @@ outputs/analysis/e001_error_analysis/hard_cases/*.jpg
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local formal experiment artifacts
+artifacts/

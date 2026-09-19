@@ -1,0 +1,10 @@
+# QualityFusionTrainer reads this split/stem manifest; Ultralytics never treats it as RGB images.
+train: ../../data/splits/train.txt
+val: ../../data/splits/val.txt
+rgb: ../../data/raw/train/visible
+ir: ../../data/raw/train/infrared
+depth: ../../data/raw/train/depth
+labels: ../../data/processed/train/labels_clean
+representation: quality11_v1
+channels: 11
+names: [person, boat, animal, seat, sign, bicycle, car, ball, light, garbage can, uav, tricycle]

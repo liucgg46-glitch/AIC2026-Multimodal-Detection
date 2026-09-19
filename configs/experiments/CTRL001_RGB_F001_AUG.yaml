@@ -1,0 +1,55 @@
+experiment_id: CTRL001_RGB_F001_AUG
+architecture:
+  model: rgb_only_yolo11n
+  input_channels: 3
+  paired_transform_then_rgb_drop: true
+  pretrained: weights/yolo11n.pt
+  pretrained_sha256: 0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1
+data_configuration:
+  rgb: data/raw/train/visible
+  ir_validation_source: data/raw/train/infrared
+  labels: data/processed/train/labels_clean
+  train: data/splits/train.txt
+  val: data/splits/val.txt
+  counts: [1600, 400]
+train:
+  model: yolo11n.yaml
+  data: configs/data/CTRL001_RGB_CANONICAL.yaml
+  task: detect
+  seed: 2026
+  deterministic: true
+  imgsz: 640
+  epochs: 100
+  batch: 32
+  workers: 8
+  device: 0
+  pretrained: weights/yolo11n.pt
+  amp: true
+  plots: false
+  cache: false
+  rect: false
+  resume: false
+  compile: false
+  fraction: 1.0
+  close_mosaic: 0
+  degrees: 0.0
+  translate: 0.0
+  scale: 0.0
+  shear: 0.0
+  perspective: 0.0
+  mosaic: 0.0
+  mixup: 0.0
+  cutmix: 0.0
+  copy_paste: 0.0
+  multi_scale: false
+  bgr: 0.0
+  fliplr: 0.5
+  flipud: 0.0
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  optimizer: auto
+  nbs: 64
+  project: runs
+  name: CTRL001_RGB_F001_AUG
+  exist_ok: false

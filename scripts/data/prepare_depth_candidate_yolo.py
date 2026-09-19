@@ -297,7 +297,7 @@ def write_candidate_png(
     candidate: str,
     percentile_params: Optional[c3.PercentileParams],
 ) -> None:
-    depth = cv2.imread(str(source), cv2.IMREAD_UNCHANGED)
+    depth = c3.read_image_unchanged(source)
     if depth is None or depth.dtype != np.uint16 or depth.ndim != 2:
         raise DepthCandidateViewError(f"PNG 必须是 IMREAD_UNCHANGED uint16 2D: {source}")
     if candidate == "log" and int(depth.max()) > D_FAR_MM:

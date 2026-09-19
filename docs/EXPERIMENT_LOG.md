@@ -241,3 +241,16 @@ Important reproduction note：正式 submission 推理时，服务器已应用�
 2. 跳过 width/height `<= 0` 的退化预测框。
 
 PR #6 已进入 `main`。Phase 1 final main 为 `560d9a92c78af0b392bf8678dd9772d5945ba3e6`，但该 commit 不是 E001 训练时的 commit。
+
+## 5. Round 5 decision: stop F003/F004 and establish stronger RGB upper bounds
+
+F003/F004 were cancelled by the experiment owner after their live validation mAP50-95 fell from the approximately 0.48 RGB initialization toward 0.45. They are retained as negative evidence; they are not promoted to formal fusion baselines.
+
+The next two formal tracks are:
+
+| Track | Model | Input | Data contract | Purpose |
+| --- | --- | ---: | --- | --- |
+| `RGB_R5_X1280` | YOLO11x COCO pretrained | 1280 | fixed 1600/400, `labels_clean` | test the Ultralytics capacity/resolution upper bound |
+| `DEIMV2_S_RGB_FORMAL` | DEIMv2-S with DINOv3-distilled ViT-Tiny | 640 | the same split exported to COCO | test a stronger, structurally different detector family |
+
+IR heat residual is not a third training track. It must first pass the predeclared read-only gate in `scripts/analysis/audit_ir_heat_residual.py`. Depth remains paused. Exact external identities, environment setup, stop criteria and commands are recorded in `docs/ROUND5_TWO_TRACK_RUNBOOK.md`.

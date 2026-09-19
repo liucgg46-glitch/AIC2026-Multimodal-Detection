@@ -152,6 +152,7 @@ def test_inference_uses_directory_source_batch_one_and_streaming(
         iou=0.7,
         max_det=100,
         force=False,
+        augment=True,
     )
 
     assert image_count == 1
@@ -161,3 +162,4 @@ def test_inference_uses_directory_source_batch_one_and_streaming(
     assert not isinstance(captured["source"], list)
     assert captured["batch"] == 1
     assert captured["stream"] is True
+    assert captured["augment"] is True

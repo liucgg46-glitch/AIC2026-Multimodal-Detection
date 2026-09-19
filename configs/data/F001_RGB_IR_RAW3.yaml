@@ -1,0 +1,10 @@
+# FusionTrainer only: train/val contain stems, not conventional image path lists.
+# Relative paths are resolved from this YAML's directory.
+train: ../../data/splits/train.txt
+val: ../../data/splits/val.txt
+rgb: ../../data/raw/train/visible
+ir: ../../data/raw/train/infrared
+labels: ../../data/processed/train/labels_clean
+representation: raw3
+channels: 6
+names: [person, boat, animal, seat, sign, bicycle, car, ball, light, garbage can, uav, tricycle]

@@ -23,6 +23,18 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
+def test_depth_reader_is_independent_of_global_imread_patch(tmp_path, monkeypatch):
+    expected = np.array([[0, 1, 300, 19999]], dtype=np.uint16)
+    path = tmp_path / "depth.png"
+    assert cv2.imwrite(str(path), expected)
+    def patched_imread(*args, **kwargs):
+        raise AssertionError("Depth reader must not use the globally patched cv2.imread")
+    monkeypatch.setattr(cv2, "imread", patched_imread)
+    actual = MODULE.read_image_unchanged(path)
+    assert actual.dtype == np.uint16 and actual.ndim == 2
+    np.testing.assert_array_equal(actual, expected)
+
+
 def write_png(path: Path, values: np.ndarray) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     assert cv2.imwrite(str(path), values)

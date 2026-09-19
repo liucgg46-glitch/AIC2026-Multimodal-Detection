@@ -1,0 +1,53 @@
+experiment_id: F003_M960_RGB_IR_PRETRAINED_P45
+use_depth: false
+data_contract: canonical_pretrained11_v1
+checkpoints:
+  rgb: runs/RGB_R2_M960/weights/best.pt
+  ir: runs/IR_R3_M960_RAW3_CLEAN/weights/best.pt
+  depth: runs/DEPTH_R4_M960_LOG_LR3E4/weights/best.pt
+train: &train
+  model: yolo11m.yaml
+  data: configs/data/F003_PRETRAINED_RGB_IR_DEPTH.yaml
+  epochs: 100
+  patience: 40
+  imgsz: 960
+  batch: 4
+  nbs: 64
+  device: 0
+  workers: 8
+  optimizer: AdamW
+  lr0: 0.0003
+  lrf: 0.01
+  momentum: 0.9
+  weight_decay: 0.0005
+  warmup_epochs: 3.0
+  warmup_bias_lr: 0.0
+  cos_lr: true
+  seed: 2026
+  deterministic: true
+  pretrained: false
+  freeze: 24
+  amp: true
+  cache: false
+  rect: false
+  resume: false
+  multi_scale: false
+  degrees: 0.0
+  translate: 0.1
+  scale: 0.5
+  shear: 0.0
+  perspective: 0.0
+  mosaic: 0.0
+  mixup: 0.0
+  copy_paste: 0.0
+  close_mosaic: 0
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  fliplr: 0.5
+  flipud: 0.0
+  plots: true
+  save: true
+  val: true
+  exist_ok: false
+  name: F003_M960_RGB_IR_PRETRAINED_P45

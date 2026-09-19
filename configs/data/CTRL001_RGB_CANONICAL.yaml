@@ -1,0 +1,9 @@
+# RGBControlTrainer only: PairedDataset validates both sources, then drops IR after transforms.
+train: ../../data/splits/train.txt
+val: ../../data/splits/val.txt
+rgb: ../../data/raw/train/visible
+ir: ../../data/raw/train/infrared
+labels: ../../data/processed/train/labels_clean
+representation: paired_transform_then_rgb_drop
+channels: 3
+names: [person, boat, animal, seat, sign, bicycle, car, ball, light, garbage can, uav, tricycle]
